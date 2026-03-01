@@ -23,8 +23,11 @@ if [[ ! -f "$STACK_DIR/scripts/bootstrap-k3d.sh" ]]; then
 fi
 
 cd "$STACK_DIR"
-# So kubectl from inside Docker can reach k3d API server on the host
-export DOCKER_GATEWAY="$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1}' || ip route | awk '/default/ {print $3}')"
+# When in a Docker bridge network (not --network host), patch kubeconfig so kubectl can reach k3d API server on the host
+GW="$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1}' || ip route 2>/dev/null | awk '/default/ {print $3}')"
+if [[ -n "$GW" ]] && [[ "$GW" =~ ^172\.(1[7-9]|2[0-9]|3[0-1])\. ]]; then
+  export DOCKER_GATEWAY="$GW"
+fi
 echo "Running k3d bootstrap (cluster: $CLUSTER_NAME) ..."
 # Pass --recreate if bootstrap supports it (this repo); omit for upstream clone.
 RECREATE_ARGS=""
