@@ -1,0 +1,82 @@
+# Dedicated Postgres instance for metadata (e.g. backend job/store, app-specific data).
+# Wire consumers via config databases.postgres_metadata.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-metadata
+  namespace: matrix-stack
+spec:
+  serviceName: postgres-metadata
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-metadata
+  template:
+    metadata:
+      labels:
+        app: postgres-metadata
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: metadata
+            - name: POSTGRES_USER
+              value: metadata
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-metadata-credentials
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "metadata"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "metadata"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-metadata-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-metadata-data
+  namespace: matrix-stack
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-metadata
+  namespace: matrix-stack
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres-metadata
+  clusterIP: None

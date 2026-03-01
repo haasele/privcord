@@ -41,6 +41,13 @@ databases:
     database: synapse_media
     user: synapse_media
     password: ""  # REPLACE or use POSTGRES_MEDIA_PASSWORD secret
+  # Dedicated metadata DB (backend job store, app-specific data)
+  postgres_metadata:
+    host: postgres-metadata
+    port: 5432
+    database: metadata
+    user: metadata
+    password: ""  # POSTGRES_METADATA_PASSWORD
   # Federated Postgres: second instance (e.g. for read replica or separate region)
   # Optional; if set, used for user/account data replication on another port.
   postgres_federated:
