@@ -3996,7 +3996,13 @@
         "voice_call": "Voice call",
         "voice_call_incoming": "Incoming voice call",
         "voice_call_using": "Voice call using:",
-        "you_are_presenting": "You are presenting"
+        "you_are_presenting": "You are presenting",
+        "persistent_call_bar": "Active call",
+        "jump_back_to_call": "Jump back to call",
+        "mute_self_hint": "Mute yourself (open call)",
+        "mute_all_hint": "Mute everyone (open call)",
+        "screenshare_manage_hint": "Screen share (open call)",
+        "voice_channel": "Voice channel"
     },
     "web_default_device_name": "%(appName)s: %(browserName)s on %(osName)s",
     "welcome_to_element": "Welcome to Element",

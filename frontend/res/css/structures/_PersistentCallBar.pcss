@@ -1,0 +1,66 @@
+/*
+Copyright 2024 New Vector Ltd.
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+*/
+
+.mx_PersistentCallBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 101;
+    background: $background-primary;
+    border-top: 1px solid $quaternary-content;
+    padding: $spacing-8 $spacing-16;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+}
+
+.mx_PersistentCallBar_toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 600px;
+    gap: $spacing-16;
+}
+
+.mx_PersistentCallBar_button {
+    display: inline-flex;
+    align-items: center;
+    gap: $spacing-8;
+    padding: $spacing-4 $spacing-8;
+    border-radius: 8px;
+    color: $primary-content;
+
+    &:hover {
+        background: $quaternary-content;
+    }
+}
+
+.mx_PersistentCallBar_jumpBack {
+    font-weight: 500;
+}
+
+.mx_PersistentCallBar_roomName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.mx_PersistentCallBar_actions {
+    display: flex;
+    align-items: center;
+    gap: $spacing-4;
+}
+
+.mx_PersistentCallBar_iconButton {
+    padding: $spacing-8;
+}
+
+.mx_PersistentCallBar_endCall {
+    color: $alert-content;
+}
