@@ -79,6 +79,7 @@ def build_synapse_homeserver(config: dict) -> str:
     return f"""# Generated from config - do not edit by hand
 server_name: "{domain}"
 public_baseurl: "https://{domain}/"
+report_stats: false
 listen_address: "0.0.0.0"
 port: 8008
 federation_port: {federation_port}
@@ -94,6 +95,7 @@ database:
     port: {db.get("port", 5432)}
     cp_min: 5
     cp_max: 10
+  allow_unsafe_locale: true
 
 redis:
   enabled: true
@@ -104,7 +106,6 @@ redis:
 worker_list:
 {worker_list_indent}
 media_store_path: "/data/media_store"
-log_config: "/config/log.config"
 signing_key_path: "/data/signing.key"
 
 modules:

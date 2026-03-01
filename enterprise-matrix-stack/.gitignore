@@ -4,5 +4,6 @@
 *.env.generated
 k8s/base/secrets.yaml
 k8s/generated/
+e2e-generated/
 *.pyc
 __pycache__/

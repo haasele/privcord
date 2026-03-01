@@ -1,0 +1,36 @@
+# Isolated Ubuntu environment: clone repo and run the stack on Kubernetes (k3d).
+# The container does NOT run the stack in Docker; it uses the host Docker (socket)
+# to run k3d, which creates a Kubernetes cluster. The stack runs inside that cluster.
+# Usage: docker build -f docker/Dockerfile.ubuntu-k8s -t privcord-k8s .  (from enterprise-matrix-stack)
+#        docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8443:8443 privcord-k8s
+
+FROM ubuntu:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    python3 \
+    python3-pip \
+    python3-venv \
+    docker.io \
+    && pip install --break-system-packages --no-cache-dir pyyaml \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# docker.io provides Docker CLI; k3d uses host Docker via mounted socket
+
+# kubectl
+RUN curl -sL "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o /usr/local/bin/kubectl \
+    && chmod +x /usr/local/bin/kubectl
+
+# k3d
+RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.8.3 bash
+
+WORKDIR /workspace
+
+COPY docker/entrypoint-k8s.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -2,8 +2,9 @@
 # Bootstrap a k3d cluster with 2 nodes and deploy the Matrix stack (Connecting branch setup).
 # Prereqs: k3d, kubectl, Python 3 + PyYAML.
 # Usage:
-#   ./scripts/bootstrap-k3d.sh [--config config/my-deployment.yaml] [--cluster-name matrix-local] [--skip-create] [--build-image]
+#   ./scripts/bootstrap-k3d.sh [--config ...] [--cluster-name matrix-local] [--skip-create] [--build-image] [--recreate]
 #   --build-image: build synapse-discordify:latest from repo root and load into k3d (requires cluster to exist)
+#   --recreate: if cluster exists, delete and recreate without prompting (for CI/Docker)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,6 +14,7 @@ CONFIG="$STACK_DIR/config/example.yaml"
 CLUSTER_NAME="matrix-local"
 SKIP_CREATE=""
 BUILD_IMAGE=""
+RECREATE=""
 GENERATED_DIR="$STACK_DIR/k8s/generated"
 BASE_DIR="$STACK_DIR/k8s/base"
 
@@ -22,6 +24,7 @@ while [[ $# -gt 0 ]]; do
     --cluster-name) CLUSTER_NAME="$2"; shift 2 ;;
     --skip-create) SKIP_CREATE=1; shift ;;
     --build-image) BUILD_IMAGE=1; shift ;;
+    --recreate) RECREATE=1; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -37,13 +40,18 @@ echo "Generated ConfigMaps in $GENERATED_DIR"
 # Create k3d cluster (2 agents = 2 nodes) if not skipping
 if [[ -z "$SKIP_CREATE" ]]; then
   if k3d cluster list 2>/dev/null | grep -q "$CLUSTER_NAME"; then
-    echo "Cluster $CLUSTER_NAME already exists. Use --skip-create to only deploy."
-    read -r -p "Delete and recreate? [y/N] " ans
-    if [[ "${ans,,}" == "y" ]]; then
+    if [[ -n "$RECREATE" ]]; then
+      echo "Cluster $CLUSTER_NAME exists; deleting and recreating (--recreate)."
       k3d cluster delete "$CLUSTER_NAME"
     else
-      echo "Exiting."
-      exit 0
+      echo "Cluster $CLUSTER_NAME already exists. Use --skip-create to only deploy or --recreate to replace."
+      read -r -p "Delete and recreate? [y/N] " ans
+      if [[ "${ans,,}" == "y" ]]; then
+        k3d cluster delete "$CLUSTER_NAME"
+      else
+        echo "Exiting."
+        exit 0
+      fi
     fi
   fi
   echo "Creating k3d cluster $CLUSTER_NAME with 2 nodes..."

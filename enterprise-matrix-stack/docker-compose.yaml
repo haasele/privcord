@@ -1,0 +1,111 @@
+# E2E local stack: Synapse + Discordify, Postgres, Redis, Backend.
+# Run: ./scripts/run-e2e-docker.sh  (generates config and starts compose)
+# Then: open http://localhost:8008 (Synapse), http://localhost:5000 (Backend API).
+# Frontend: run separately in frontend/ with npm start, point at http://localhost:8008.
+---
+services:
+  postgres-main:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: synapse-e2e-secret
+    volumes:
+      - postgres-main-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  postgres-media:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: synapse_media
+      POSTGRES_USER: synapse_media
+      POSTGRES_PASSWORD: media-e2e-secret
+    volumes:
+      - postgres-media-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse_media"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5433:5432"
+
+  postgres-metadata:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: metadata
+      POSTGRES_USER: metadata
+      POSTGRES_PASSWORD: metadata-e2e-secret
+    volumes:
+      - postgres-metadata-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metadata"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5434:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "6379:6379"
+
+  synapse:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: synapse-discordify:latest
+    user: "0"  # E2E: run as root so /data is writable (volume created as root)
+    depends_on:
+      postgres-main: { condition: service_healthy }
+      postgres-media: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    volumes:
+      - ./e2e-generated:/config
+      - synapse-data:/data
+    ports:
+      - "8008:8008"
+      - "8448:8448"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/_matrix/client/versions"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    image: python:3.11-slim
+    working_dir: /stack/backend
+    command: ["sh", "-c", "pip install -q flask pyyaml psycopg2-binary && python app.py"]
+    environment:
+      STACK_DIR: /stack
+      ENABLE_DEPLOY: "0"
+      PORT: "5000"
+      DATABASE_URL_METADATA: "postgresql://metadata:metadata-e2e-secret@postgres-metadata:5432/metadata"
+    volumes:
+      - .:/stack:ro
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres-metadata
+
+volumes:
+  postgres-main-data: {}
+  postgres-media-data: {}
+  postgres-metadata-data: {}
+  synapse-data: {}

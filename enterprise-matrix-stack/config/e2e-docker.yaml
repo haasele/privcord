@@ -1,0 +1,51 @@
+# Config for E2E Docker Compose (localhost, service names as hostnames).
+server:
+  handle: e2e
+  domain: localhost
+  federation_port: 8448
+space:
+  name: "E2E Test Space"
+  description: "Local test"
+federation:
+  mode: private
+  whitelist: []
+databases:
+  postgres_main:
+    host: postgres-main
+    port: 5432
+    database: synapse
+    user: synapse
+    password: synapse-e2e-secret
+  postgres_media:
+    host: postgres-media
+    port: 5432
+    database: synapse_media
+    user: synapse_media
+    password: media-e2e-secret
+  redis:
+    host: redis
+    port: 6379
+    password: ""
+  postgres_metadata:
+    host: postgres-metadata
+    port: 5432
+    database: metadata
+    user: metadata
+    password: metadata-e2e-secret
+synapse:
+  discordify:
+    channels:
+      - { name: "general", type: "text", default: true }
+      - { name: "Voice", type: "voice" }
+    roles:
+      - { name: "User", power_level: 0 }
+  registration_shared_secret: "e2e-registration-secret"
+  signing_key_path: /data/signing.key
+turn:
+  enabled: false
+livekit:
+  enabled: false
+element_call:
+  enabled: false
+deploy:
+  namespace: matrix-stack
