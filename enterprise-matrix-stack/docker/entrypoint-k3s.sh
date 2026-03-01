@@ -23,8 +23,9 @@ fi
 if [[ ! -f "$K3S_KUBECONFIG" ]]; then
   echo "Starting K3s server in this container..."
   mkdir -p /etc/rancher/k3s
-  # Disable traefik/servicelb to avoid extra pods; use same ports as our stack
-  k3s server --disable traefik --disable servicelb --write-kubeconfig-mode 644 &
+  # --snapshotter=native: overlayfs often fails when K3s runs inside a container; native uses copy (slower but works)
+  # Disable traefik/servicelb to avoid extra pods
+  k3s server --snapshotter=native --disable traefik --disable servicelb --write-kubeconfig-mode 644 &
   for i in {1..90}; do
     if [[ -f "$K3S_KUBECONFIG" ]] && kubectl --kubeconfig="$K3S_KUBECONFIG" get nodes &>/dev/null; then break; fi
     [[ $i -eq 90 ]] && { echo "K3s server did not become ready."; exit 1; }
