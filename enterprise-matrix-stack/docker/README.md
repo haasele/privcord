@@ -13,11 +13,12 @@ docker build -f docker/Dockerfile.ubuntu-k8s -t privcord-k8s .
 ## Run
 
 ```bash
-docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock -p 8443:8443 privcord-k8s
+docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock --network host privcord-k8s
 ```
 
 - **`-v /var/run/docker.sock:/var/run/docker.sock`** — required so k3d can create the cluster on the host.
-- **`-p 8443:8443`** — optional; maps k3d load balancer port if you use Ingress on 443.
+- **`--network host`** — recommended so kubectl inside the container can reach the k3d API server on the host (otherwise use `DOCKER_GATEWAY` and the script will patch the kubeconfig).
+- **`-p 8443:8443`** — omit when using `--network host` (host network already exposes ports).
 
 The container will:
 

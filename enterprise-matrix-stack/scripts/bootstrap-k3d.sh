@@ -67,6 +67,11 @@ if [[ -z "$KUBECONFIG" ]]; then
   exit 1
 fi
 
+# When running inside Docker (not host network), 0.0.0.0/127.0.0.1 in kubeconfig points at the container. Patch to use host gateway.
+if [[ -f "$KUBECONFIG" ]] && [[ -n "${DOCKER_GATEWAY:-}" ]]; then
+  sed -i "s|https://0.0.0.0:|https://${DOCKER_GATEWAY}:|g; s|https://127.0.0.1:|https://${DOCKER_GATEWAY}:|g" "$KUBECONFIG"
+fi
+
 # Wait for API server to be reachable (k3d can be slow right after create)
 echo "Waiting for API server..."
 for i in {1..30}; do
