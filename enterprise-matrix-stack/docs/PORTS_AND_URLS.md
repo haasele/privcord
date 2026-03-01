@@ -43,9 +43,29 @@ docker compose -f docker-compose.e2e.yml down
 
 ---
 
-## 2. Ubuntu container: clone repo and run on Kubernetes (k3d)
+## 2. Fully isolated: KIND inside the container
 
-Docker is used only as an **isolated environment** (one Ubuntu container). The stack runs in **Kubernetes** via k3d (the container uses the host Docker socket so k3d can create the cluster).
+Everything (Docker daemon, KIND cluster, workloads) runs **inside** the container. Your PC is not used.
+
+```bash
+cd enterprise-matrix-stack
+docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
+docker run -it --rm --privileged -p 8008:8008 privcord-kind
+```
+
+Inside the container shell, run `kubectl get pods -n matrix-stack`. To reach Synapse from your PC, in that same shell run:
+
+```bash
+kubectl port-forward -n matrix-stack svc/synapse 8008:8008
+```
+
+Then open http://localhost:8008 on your PC (because you used `-p 8008:8008`).
+
+---
+
+## 3. Ubuntu container: clone repo and run on Kubernetes (k3d, cluster on host)
+
+Docker is used only as an **isolated environment** (one Ubuntu container). The stack runs in **Kubernetes** via k3d (the container uses the host Docker socket so k3d creates the cluster on your host).
 
 **Build and run:**
 
@@ -66,7 +86,7 @@ kubectl get pods -n matrix-stack
 
 ---
 
-## 3. k3d deployment (full stack)
+## 4. k3d deployment (full stack)
 
 After running `./scripts/bootstrap-k3d.sh` (from `enterprise-matrix-stack/`), services run **inside** the cluster. There is no Ingress by default, so use **port-forward** to access them from your machine:
 
@@ -108,7 +128,7 @@ kubectl port-forward -n matrix-stack svc/element-call 8080:80 &
 
 ---
 
-## 4. Quick reference (Docker E2E)
+## 5. Quick reference (Docker E2E)
 
 | What you want to do        | URL / command |
 |----------------------------|---------------|

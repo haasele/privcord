@@ -1,0 +1,8 @@
+# KIND cluster config for fully isolated run (cluster lives inside the container).
+# Used by bootstrap-kind.sh when creating the cluster.
+# To reach services from your PC: docker exec -it <container> kubectl port-forward -n matrix-stack svc/synapse 8008:8008
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: matrix-local
+nodes:
+  - role: control-plane

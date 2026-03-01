@@ -1,47 +1,87 @@
-# Run the stack in an Ubuntu container (Kubernetes via k3d)
+# Run the stack in an Ubuntu container (Kubernetes)
 
-Docker is used only as an **isolated environment**: one Ubuntu container where we clone the repo and run the **Kubernetes** stack with k3d. The stack does **not** run as Docker Compose inside the container; it runs as a k3d cluster (using the host Docker socket).
+Two options: **fully isolated (KIND)** so nothing runs on your PC, or **k3d** with the cluster on the host.
 
-## Build
+---
+
+## Option 1: Fully isolated (KIND) — recommended
+
+**Everything runs inside the container**: Docker daemon, KIND cluster, and all workloads. Your PC is not used for the cluster.
+
+### Build
 
 From `enterprise-matrix-stack/`:
+
+```bash
+docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
+```
+
+### Run
+
+```bash
+docker run -it --rm --privileged privcord-kind
+```
+
+- **`--privileged`** — required for Docker-in-Docker (the container runs its own Docker daemon and KIND cluster).
+- Optional: mount the repo to avoid clone: `-v /path/to/API-Addon:/workspace/privcord`.
+- Optional: expose ports for port-forward from the host, e.g. `-p 8008:8008` then inside the container run `kubectl port-forward -n matrix-stack svc/synapse 8008:8008` and use http://localhost:8008 on your PC.
+
+The container will:
+
+1. Start the Docker daemon inside the container.
+2. Clone the git repo (or use the mounted path).
+3. Run `bootstrap-kind.sh --recreate --build-image` to create a KIND cluster and deploy the stack.
+4. Drop you into a shell; run `kubectl get pods -n matrix-stack`. The cluster is **only** inside this container.
+
+To reach services from your PC: keep the container running, then in another terminal run port-forward **inside** the container and publish the port:
+
+```bash
+# Terminal 1: run container with port 8008 published
+docker run -it --rm --privileged -p 8008:8008 privcord-kind
+
+# Inside the container shell:
+kubectl port-forward -n matrix-stack svc/synapse 8008:8008
+# Then on your PC: http://localhost:8008
+```
+
+---
+
+## Option 2: k3d (cluster on host)
+
+The container only runs the bootstrap script; the Kubernetes cluster and workloads run on **your host PC** (via the Docker socket).
+
+**Where does the cluster run?** Because the container mounts the host Docker socket, k3d creates the cluster on your host. So `kubectl` on your PC talks to that cluster (fix kubeconfig with `127.0.0.1` as below).
+
+### Build
 
 ```bash
 docker build -f docker/Dockerfile.ubuntu-k8s -t privcord-k8s .
 ```
 
-## Run
+### Run
 
 ```bash
 docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock --network host privcord-k8s
 ```
 
-- **`-v /var/run/docker.sock:/var/run/docker.sock`** — required so k3d can create the cluster on the host.
-- **`--network host`** — recommended so kubectl inside the container can reach the k3d API server on the host (otherwise use `DOCKER_GATEWAY` and the script will patch the kubeconfig).
-- **`-p 8443:8443`** — omit when using `--network host` (host network already exposes ports).
+- **`-v /var/run/docker.sock:/var/run/docker.sock`** — required so k3d creates the cluster on the host.
+- **`--network host`** — recommended so kubectl inside the container can reach the API server.
 
-The container will:
+### Using kubectl from your PC
 
-1. Clone the git repo (default: `https://github.com/haasele/privcord.git`).
-2. Run `bootstrap-k3d.sh --recreate --build-image` to create a k3d cluster and deploy the stack.
-3. Drop you into a shell with `KUBECONFIG` set; use `kubectl get pods -n matrix-stack` and port-forwards as in [PORTS_AND_URLS.md](../docs/PORTS_AND_URLS.md).
+```bash
+export KUBECONFIG=$(k3d kubeconfig write matrix-local)
+sed -i.bak 's|https://0.0.0.0:|https://127.0.0.1:|g' "$KUBECONFIG"
+kubectl get pods -n matrix-stack
+```
 
-## Env vars
+---
+
+## Env vars (both options)
 
 | Variable       | Default                          | Description |
 |----------------|-----------------------------------|-------------|
 | `REPO_URL`     | `https://github.com/haasele/privcord.git` | Git URL to clone. |
 | `CLONE_DIR`    | `/workspace/privcord`            | Directory to clone into. |
-| `CLUSTER_NAME` | `matrix-local`                   | k3d cluster name. |
+| `CLUSTER_NAME` | `matrix-local`                   | Cluster name (kind/k3d). |
 | `KEEP_ALIVE`   | `1`                              | `0` = exit after bootstrap; `1` = drop to shell. |
-
-## Using the cluster from the host
-
-After the container has created the cluster, you can use it from the host:
-
-```bash
-export KUBECONFIG=$(k3d kubeconfig write matrix-local)
-kubectl get pods -n matrix-stack
-```
-
-The cluster keeps running even if the Ubuntu container is stopped.
