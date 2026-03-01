@@ -594,6 +594,67 @@ test.describe("Element Call", () => {
             await app.viewRoomById(room.roomId);
             await openAndJoinCall(page, true);
         });
+
+        test("Call features: persistent call bar shows mute, screenshare, and end call", async ({
+            page,
+            user,
+            room,
+            app,
+        }) => {
+            await app.viewRoomById(room.roomId);
+            await expect(page.getByText("Bob and one other were invited and joined")).toBeVisible();
+
+            await openAndJoinCall(page);
+            await app.viewRoomByName("OtherRoom");
+
+            const bar = page.locator(".mx_PersistentCallBar");
+            await expect(bar).toBeVisible();
+            await expect(bar.getByRole("button", { name: /Jump back to call/i })).toBeVisible();
+            await expect(bar.getByRole("button", { name: /Mute yourself/i })).toBeVisible();
+            await expect(bar.getByRole("button", { name: /Mute everyone/i })).toBeVisible();
+            await expect(bar.getByRole("button", { name: /Screen share/i })).toBeVisible();
+            await expect(bar.getByRole("button", { name: /End call|Leave/i })).toBeVisible();
+        });
+
+        test("Call features: jump back to call returns to fullscreen call view", async ({
+            page,
+            user,
+            room,
+            app,
+        }) => {
+            await app.viewRoomById(room.roomId);
+            await expect(page.getByText("Bob and one other were invited and joined")).toBeVisible();
+
+            await openAndJoinCall(page);
+            await app.viewRoomByName("OtherRoom");
+
+            await expect(page.locator(".mx_PersistentCallBar")).toBeVisible();
+            await page.locator(".mx_PersistentCallBar").getByRole("button", { name: /Jump back to call/i }).click();
+
+            await expect(page).toHaveURL(new RegExp(room.roomId));
+            const iframe = page.locator("iframe");
+            await expect(iframe).toBeVisible();
+        });
+
+        test("Call features: end call from persistent bar leaves the call", async ({
+            page,
+            user,
+            room,
+            app,
+        }) => {
+            await app.viewRoomById(room.roomId);
+            await expect(page.getByText("Bob and one other were invited and joined")).toBeVisible();
+
+            await openAndJoinCall(page);
+            await app.viewRoomByName("OtherRoom");
+
+            const bar = page.locator(".mx_PersistentCallBar");
+            await expect(bar).toBeVisible();
+            await bar.getByRole("button", { name: /End call|Leave/i }).first().click();
+
+            await expect(bar).not.toBeVisible();
+            await expect(page.getByTestId("notification-decoration")).not.toBeVisible();
+        });
     });
 
     test.describe("Widget leak bug reproduction", { tag: ["@no-firefox", "@no-webkit"] }, () => {
