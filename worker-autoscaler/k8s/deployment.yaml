@@ -1,0 +1,98 @@
+# Deploy the autoscaler inside the cluster so it can call the Kubernetes API.
+# It needs RBAC to read metrics and patch Deployment/StatefulSet scale.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker-autoscaler
+  namespace: matrix-stack
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: worker-autoscaler
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale", "statefulsets", "statefulsets/scale"]
+    verbs: ["get", "patch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: worker-autoscaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: worker-autoscaler
+subjects:
+  - kind: ServiceAccount
+    name: worker-autoscaler
+    namespace: matrix-stack
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-autoscaler-config
+  namespace: matrix-stack
+data:
+  config.yaml: |
+    target:
+      kind: Deployment
+      name: synapse
+      namespace: matrix-stack
+    replicas:
+      min: 1
+      max: 10
+    interval: 60
+    metrics_source: kubernetes
+    kubernetes_metrics:
+      scale_up_cpu_threshold: 0.70
+      scale_down_cpu_threshold: 0.30
+    scaling:
+      scale_up_cooldown: 120
+      scale_down_cooldown: 300
+      max_replica_step: 2
+    log_level: INFO
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-autoscaler
+  namespace: matrix-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-autoscaler
+  template:
+    metadata:
+      labels:
+        app: worker-autoscaler
+    spec:
+      serviceAccountName: worker-autoscaler
+      containers:
+        - name: autoscaler
+          image: worker-autoscaler:latest
+          args:
+            - --config
+            - /config/config.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+      volumes:
+        - name: config
+          configMap:
+            name: worker-autoscaler-config

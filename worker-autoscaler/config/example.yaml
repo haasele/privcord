@@ -1,0 +1,52 @@
+# Worker pool autoscaler – analyze workload and worker usage, adjust replicas automatically.
+# Use with: python -m worker_autoscaler --config config/example.yaml
+
+# Target to scale (Kubernetes Deployment or StatefulSet)
+target:
+  kind: Deployment  # Deployment | StatefulSet
+  name: synapse    # name of the resource
+  namespace: matrix-stack
+
+# Replica bounds
+replicas:
+  min: 1
+  max: 10
+
+# How often to evaluate and optionally scale (seconds)
+interval: 60
+
+# Metrics source: "kubernetes" (metrics-server) or "prometheus"
+metrics_source: kubernetes
+
+# When using metrics_source: kubernetes
+# Uses the Kubernetes metrics API (requires metrics-server in cluster).
+# Scale when average CPU (across current worker pods) is above/below thresholds.
+kubernetes_metrics:
+  # Scale up when average pod CPU utilization (0.0-1.0) is above this
+  scale_up_cpu_threshold: 0.70
+  # Scale down when average pod CPU utilization is below this
+  scale_down_cpu_threshold: 0.30
+  # Optional: scale on memory (0.0-1.0 = fraction of requested memory used)
+  # scale_up_memory_threshold: 0.80
+  # scale_down_memory_threshold: 0.40
+
+# When using metrics_source: prometheus
+prometheus:
+  url: http://prometheus.monitoring:9090
+  # PromQL: must return a single number (e.g. average CPU or request rate)
+  scale_up_query: 'avg(rate(container_cpu_usage_seconds_total{pod=~"synapse-.*"}[5m]))'
+  scale_down_query: 'avg(rate(container_cpu_usage_seconds_total{pod=~"synapse-.*"}[5m]))'
+  scale_up_threshold: 0.70
+  scale_down_threshold: 0.30
+
+# Scaling behavior
+scaling:
+  # Cooldown: don't scale up again for this many seconds after a scale-up
+  scale_up_cooldown: 120
+  # Don't scale down again for this many seconds after a scale-down
+  scale_down_cooldown: 300
+  # Step: change replicas by at most this many per evaluation
+  max_replica_step: 2
+
+# Logging
+log_level: INFO  # DEBUG | INFO | WARNING | ERROR

@@ -1,0 +1,72 @@
+# Optional: second Postgres instance (e.g. federated / read replica on different port)
+# Enable only when config.databases.postgres_federated.enabled is true
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-federated
+  namespace: matrix-stack
+spec:
+  serviceName: postgres-federated
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-federated
+  template:
+    metadata:
+      labels:
+        app: postgres-federated
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: synapse
+            - name: POSTGRES_USER
+              value: synapse_fed
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-federated-credentials
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-federated-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-federated-data
+  namespace: matrix-stack
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-federated
+  namespace: matrix-stack
+spec:
+  ports:
+    - port: 5433
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres-federated
+  clusterIP: None

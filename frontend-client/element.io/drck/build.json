@@ -1,0 +1,9 @@
+{
+  "appId": "im.drck.chat",
+  "name": "drck-desktop",
+  "productName": "DRCK",
+  "description": "DRCK – Matrix chat with Spaces (Discord-style)",
+  "protocols": ["im.drck.chat", "drck"],
+  "linux.executableName": "drck-desktop",
+  "linux.deb.name": "drck-desktop"
+}

@@ -1,0 +1,29 @@
+{
+  "default_server_name": "matrix.example.com",
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "https://matrix.example.com"
+    },
+    "m.identity_server": {
+      "base_url": "https://vector.im"
+    }
+  },
+  "brand": "DRCK",
+  "show_labs_settings": true,
+  "features": {
+    "feature_video_rooms": true,
+    "feature_group_calls": true,
+    "feature_element_call_video_rooms": true,
+    "threadsActivityCentre": true,
+    "feature_spotlight": true
+  },
+  "element_call": {
+    "url": "https://call.matrix.example.com"
+  },
+  "room_directory": {
+    "servers": ["matrix.example.com"]
+  },
+  "setting_defaults": {
+    "RustCrypto.staged_rollout_percent": 100
+  }
+}

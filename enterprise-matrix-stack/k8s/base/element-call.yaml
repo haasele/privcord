@@ -1,0 +1,53 @@
+# Element Call - WebRTC calling frontend (connects to Synapse + LiveKit)
+# Image: element call or element-call docker image
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: element-call
+  namespace: matrix-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: element-call
+  template:
+    metadata:
+      labels:
+        app: element-call
+    spec:
+      containers:
+        - name: element-call
+          image: vectorim/element-call:latest
+          ports:
+            - containerPort: 80
+          env:
+            - name: HOMESERVER_URL
+              value: "https://CHANGEME_DOMAIN"
+            - name: LIVEKIT_URL
+              value: "wss://CHANGEME_LIVEKIT_WS"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: element-call
+  namespace: matrix-stack
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: element-call

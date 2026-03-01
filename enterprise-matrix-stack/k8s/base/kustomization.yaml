@@ -1,0 +1,17 @@
+# Apply with: kubectl apply -k k8s/base/
+# Replace synapse-config with generated ConfigMap (see scripts/generate_manifests.py)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: matrix-stack
+resources:
+  - namespace.yaml
+  - postgres-main.yaml
+  - postgres-media.yaml
+  - redis.yaml
+  - synapse.yaml
+  - livekit.yaml
+  - element-call.yaml
+  - turn.yaml
+# Uncomment if using federated Postgres:
+# - postgres-federated.yaml
+# Do not add secrets.example.yaml to resources; copy to secrets.yaml and apply separately.

@@ -1,0 +1,228 @@
+/*
+ * DRCK Discord-style layout, colors, buttons and menus.
+ * Default dark theme; Discord palette; button/menu placement like Discord.
+ */
+
+/* ========== Discord color scheme (dark mode default) ========== */
+:root {
+    /* Discord palette: server strip, sidebars, main */
+    --drck-bg-server-strip: #1e1f22;
+    --drck-bg-sidebar: #2b2d31;
+    --drck-bg-main: #313338;
+    --drck-bg-hover: rgba(255, 255, 255, 0.06);
+    --drck-bg-active: rgba(255, 255, 255, 0.1);
+    --drck-text-primary: #f2f3f5;
+    --drck-text-secondary: #b9bbbe;
+    --drck-text-muted: #80848e;
+    --drck-accent: #5865f2;
+    --drck-accent-hover: #4752c4;
+    --drck-border: rgba(255, 255, 255, 0.06);
+    --drck-separator: rgba(4, 4, 5, 0.15);
+}
+
+/* Apply Discord canvas colors when dark theme is active */
+body {
+    color-scheme: dark;
+}
+
+.mx_MatrixChat_wrapper {
+    --cpd-color-bg-canvas-default: #313338;
+    --cpd-color-bg-canvas-subtle: #2b2d31;
+    --cpd-color-bg-subtle-primary: rgba(255, 255, 255, 0.06);
+    --cpd-color-bg-subtle-secondary: rgba(255, 255, 255, 0.04);
+    --cpd-color-text-primary: #f2f3f5;
+    --cpd-color-text-secondary: #b9bbbe;
+    --cpd-color-text-tertiary: #80848e;
+    --cpd-color-icon-primary: #b9bbbe;
+    --cpd-color-icon-secondary: #80848e;
+    --cpd-color-icon-tertiary: #4e5058;
+    --cpd-color-bg-action-primary-rest: #5865f2;
+    --cpd-color-bg-action-primary-hovered: #4752c4;
+    --cpd-color-bg-action-primary-pressed: #3c45a5;
+}
+
+/* Left side: server strip + channel list (Discord-style) */
+.mx_LeftPanel_outerWrapper {
+    /* Ensure server list (SpacePanel) and channel list sit side by side like Discord */
+    min-width: 0;
+}
+
+.mx_SpacePanel {
+    /* Discord-like server strip: dark background, round server icons */
+    background-color: var(--drck-bg-server-strip) !important;
+    border-right: 1px solid var(--drck-border);
+
+    &.newUi {
+        background-color: var(--drck-bg-server-strip) !important;
+    }
+
+    /* Round server icons like Discord */
+    .mx_SpaceButton_icon,
+    .mx_SpaceButton_avatarWrapper .mx_BaseAvatar,
+    .mx_SpaceButton_selectionWrapper .mx_BaseAvatar {
+        border-radius: 50% !important;
+    }
+
+    .mx_SpaceButton.mx_SpaceButton_narrow .mx_SpaceButton_selectionWrapper {
+        width: 48px;
+        border-radius: 50%;
+    }
+
+    .mx_SpaceButton_icon {
+        border-radius: 50% !important;
+        min-width: 40px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Home / new server button */
+    .mx_SpaceButton_new .mx_SpaceButton_icon {
+        border-radius: 50%;
+    }
+
+    /* Ensure first item (Home) is centered like other server icons in the strip */
+    .mx_SpaceTreeLevel > .mx_SpaceItem:first-child > .mx_SpaceButton {
+        justify-content: center;
+        margin-left: 0;
+    }
+}
+
+/* Channel list (left panel content) - Discord-style darker sidebar */
+.mx_LeftPanel_wrapper .mx_LeftPanel_wrapper--user {
+    background-color: var(--drck-bg-sidebar);
+    border-right: 1px solid var(--drck-border);
+}
+
+.mx_LeftPanel .mx_LeftPanel_roomListContainer {
+    background-color: var(--drck-bg-sidebar);
+}
+
+.mx_LeftPanel_newRoomList {
+    background-color: var(--drck-bg-sidebar) !important;
+}
+
+/* Left panel: search/filter at top (Discord-style), consistent spacing */
+.mx_LeftPanel_filterContainer {
+    padding: 12px 12px 10px;
+    border-bottom: 1px solid var(--drck-border);
+}
+
+/* Channel tiles: Discord-style */
+.mx_RoomTile {
+    border-radius: 4px;
+    margin: 0 8px 2px 8px;
+    padding: 6px 8px;
+}
+
+.mx_RoomTile.mx_RoomTile_selected,
+.mx_RoomTile:hover {
+    background-color: var(--drck-bg-hover);
+}
+
+/* Right panel: member list (Discord-style) */
+.mx_RightPanel {
+    background-color: var(--drck-bg-sidebar);
+    border-left: 1px solid var(--drck-border);
+    min-width: 240px;
+}
+
+.mx_MemberListView {
+    background-color: transparent;
+}
+
+.mx_MemberList_header {
+    padding: 16px;
+    border-bottom: 1px solid var(--drck-border);
+}
+
+/* Resize handle between center and right panel */
+.mx_ResizeHandle--horizontal::before {
+    border-radius: 2px;
+    background-color: var(--drck-text-muted);
+    opacity: 0.6;
+}
+
+.mx_ResizeHandle--horizontal:hover::before {
+    opacity: 1;
+}
+
+/* ========== Room header: Discord-like button placement (right-aligned group) ========== */
+.mx_RoomHeader {
+    background-color: var(--drck-bg-main);
+    border-bottom: 1px solid var(--drck-border);
+    padding-left: 16px;
+    padding-right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Channel name / info takes remaining space so header buttons sit on the right (Discord style) */
+.mx_RoomHeader_infoWrapper {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Header icon buttons: Discord-style tight group on the right */
+.mx_RoomHeader > button[aria-label],
+.mx_RoomHeader .mx_FacePile {
+    flex-shrink: 0;
+}
+
+/* ========== Context menus & dropdowns: Discord-style dark ========== */
+.mx_IconizedContextMenu,
+.mx_ContextualMenu,
+.mx_ContextualMenu_background + .mx_ContextualMenu,
+[data-radix-popper-content-wrapper] [role="menu"],
+.cpd-menu-content {
+    background-color: var(--drck-bg-sidebar) !important;
+    border: 1px solid var(--drck-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.mx_IconizedContextMenu .mx_IconizedContextMenu_item:hover,
+.mx_ContextualMenu .mx_ContextualMenu_item:hover,
+.mx_ContextualMenu .mx_IconizedContextMenu_item:hover {
+    background-color: var(--drck-bg-hover);
+}
+
+/* Compound Menu / Dropdown (Discord-like) */
+[data-radix-popper-content-wrapper] {
+    --cpd-color-bg-canvas-default: var(--drck-bg-sidebar);
+}
+
+/* Modal / dialog layer (Discord-style dark) */
+.mx_Dialog_wrapper {
+    --cpd-color-bg-canvas-default: var(--drck-bg-sidebar);
+}
+
+.mx_Dialog {
+    background-color: var(--drck-bg-sidebar);
+    border: 1px solid var(--drck-border);
+    border-radius: 8px;
+}
+
+/* SpacePanel: user menu at bottom (Discord-style) */
+.mx_SpacePanel .mx_UserMenu {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--drck-border);
+}
+
+/* ========== Main timeline area Discord bg ========== */
+.mx_RoomView_wrapper,
+.mx_MatrixChat > .mx_RoomView_wrapper {
+    background-color: var(--drck-bg-main);
+}
+
+.mx_MessagePanel {
+    background-color: var(--drck-bg-main);
+}
+
+/* ScrollPanel / timeline */
+.mx_ScrollPanel {
+    background-color: var(--drck-bg-main);
+}

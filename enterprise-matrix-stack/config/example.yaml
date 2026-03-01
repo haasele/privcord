@@ -1,0 +1,114 @@
+# Enterprise Matrix Stack - Master Configuration
+# Use this file (or the wizard) to define your server, space, federation, and secrets.
+# Then run: python3 scripts/generate_manifests.py --config config/example.yaml --out k8s/generated
+
+server:
+  # Public handle/name of the server (e.g. "mycompany", "gaming-club")
+  handle: mycompany
+  # Base domain for this deployment (e.g. "matrix.example.com")
+  domain: matrix.example.com
+  # Optional: custom federation port (default 8448). Used when public + whitelist.
+  federation_port: 8448
+
+space:
+  # Auto-created Space (Discord-like "server") settings
+  name: "My Company Chat"
+  description: "Official company Matrix space - use channels for team chat and voice."
+  # default_channel: "general"  # optional; first text channel used if unset
+
+federation:
+  # "private" = non-federated (no federation at all)
+  # "public"  = federated only with whitelisted servers (same module + custom port)
+  mode: private  # private | public
+  # When mode=public: list of server names allowed to federate (e.g. ["other.example.com"])
+  whitelist: []
+  # When mode=public: listen on this port for federation (must match federation_port)
+  # port: 8448
+
+databases:
+  # PostgreSQL for Synapse main (users, rooms, state)
+  postgres_main:
+    host: postgres-main
+    port: 5432
+    database: synapse
+    user: synapse
+    # Set via env or secret in production; here for schema clarity
+    password: ""  # REPLACE or use POSTGRES_MAIN_PASSWORD secret
+  # PostgreSQL for Synapse media store (optional separate DB)
+  postgres_media:
+    host: postgres-media
+    port: 5432
+    database: synapse_media
+    user: synapse_media
+    password: ""  # REPLACE or use POSTGRES_MEDIA_PASSWORD secret
+  # Federated Postgres: second instance (e.g. for read replica or separate region)
+  # Optional; if set, used for user/account data replication on another port.
+  postgres_federated:
+    enabled: false
+    host: postgres-federated
+    port: 5433  # different port
+    database: synapse
+    user: synapse_fed
+    password: ""
+  # Redis (for Synapse workers / LiveKit / caches)
+  redis:
+    host: redis
+    port: 6379
+    password: ""  # REPLACE or use REDIS_PASSWORD secret
+
+synapse:
+  # Discordify module is loaded; config comes from this file or ConfigMap
+  discordify:
+    channels:
+      - name: "general"
+        type: "text"
+        default: true
+      - name: "Voice"
+        type: "voice"
+    roles:
+      - name: "Owner"
+        power_level: 100
+      - name: "Moderator"
+        power_level: 50
+      - name: "User"
+        power_level: 0
+  # Registration shared secret (for admin registration)
+  registration_shared_secret: ""  # REPLACE or use secret
+  # Signing key path (mounted from Secret)
+  signing_key_path: /data/signing.key
+
+turn:
+  # TURN server (e.g. coturn) for WebRTC
+  enabled: true
+  host: turn.example.com  # or k8s service name for internal
+  port: 3478
+  tls_port: 5349
+  shared_secret: ""  # REPLACE or use TURN_SECRET secret
+  # Realm usually matches server domain
+  realm: matrix.example.com
+
+livekit:
+  # Element Call / LiveKit SFU backend
+  enabled: true
+  host: livekit
+  port: 7880
+  # API key/secret for LiveKit (from LiveKit cloud or self-hosted)
+  api_key: ""    # REPLACE or use secret
+  api_secret: "" # REPLACE or use secret
+  # WebSocket URL for clients
+  ws_url: wss://livekit.matrix.example.com
+
+element_call:
+  # Element Call frontend
+  enabled: true
+  # URL where Element Call is served
+  base_url: https://call.matrix.example.com
+
+# Kubernetes / deployment options (used by generator)
+deploy:
+  namespace: matrix-mycompany
+  # Image pull secrets if using private registries
+  image_pull_secrets: []
+  # Resource requests/limits per component (optional overrides)
+  # resources:
+  #   synapse: { requests: { memory: "512Mi", cpu: "250m" }, limits: { memory: "2Gi", cpu: "1" } }

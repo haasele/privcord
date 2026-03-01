@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: synapse-config
+  namespace: matrix-stack
+data:
+  # Override with generator output; example structure
+  homeserver.yaml: |
+    server_name: "CHANGEME_DOMAIN"
+    public_baseurl: "https://CHANGEME_DOMAIN/"
+    listen_address: "0.0.0.0"
+    port: 8008
+    federation_port: 8448
+    database:
+      name: psycopg2
+      args:
+        database: synapse
+        user: synapse
+        password: CHANGEME
+        host: postgres-main
+        port: 5432
+        cp_min: 5
+        cp_max: 10
+    media_store_path: "/data/media_store"
+    log_config: "/config/log.config"
+    signing_key_path: "/data/signing.key"
+    modules:
+      - module: discordify-module.DiscordifySpacesModule
+        config:
+          channels:
+            - name: "general"
+              type: "text"
+              default: true
+            - name: "Voice"
+              type: "voice"
+          roles:
+            - name: "Owner"
+              power_level: 100
+            - name: "Moderator"
+              power_level: 50
+            - name: "User"
+              power_level: 0
+          voice_room_type: "org.matrix.msc3401.video_room"
+          join_rule: "public"
+          history_visibility: "shared"
+          encryption: false
+          admin_power_level: 100
+          restrict_to_local_users: false
+          max_concurrency: 4
+          retry_count: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse
+  namespace: matrix-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: synapse
+  template:
+    metadata:
+      labels:
+        app: synapse
+    spec:
+      containers:
+        - name: synapse
+          image: matrixdotorg/synapse:latest
+          ports:
+            - containerPort: 8008
+            - containerPort: 8448
+          env:
+            - name: SYNAPSE_CONFIG_PATH
+              value: /config/homeserver.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          livenessProbe:
+            httpGet:
+              path: /_matrix/client/versions
+              port: 8008
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_matrix/client/versions
+              port: 8008
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: synapse-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: synapse-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: synapse-data
+  namespace: matrix-stack
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: synapse
+  namespace: matrix-stack
+spec:
+  ports:
+    - name: http
+      port: 8008
+      targetPort: 8008
+    - name: federation
+      port: 8448
+      targetPort: 8448
+  selector:
+    app: synapse

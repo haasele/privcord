@@ -1,0 +1,8 @@
+# Generated and secrets - do not commit
+.env
+.env.*
+*.env.generated
+k8s/base/secrets.yaml
+k8s/generated/
+*.pyc
+__pycache__/

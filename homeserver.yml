@@ -1,0 +1,30 @@
+modules:
+  - module: discordify-module.DiscordifySpacesModule
+    config:
+      channels:
+        - name: "Allgemein"
+          type: "text"
+          topic: "General chat"
+          default: true
+          order: 0
+        - name: "Voice"
+          type: "voice"
+          order: 1
+      # Optional: space_name: "My Server"
+      # Optional: space_avatar: "mxc://..."
+      # Optional roles (name + power_level)
+      roles:
+        - name: "Owner"
+          power_level: 100
+        - name: "Moderator"
+          power_level: 50
+        - name: "User"
+          power_level: 0
+      voice_room_type: "org.matrix.msc3401.video_room"
+      join_rule: "public"
+      history_visibility: "shared"
+      encryption: false
+      admin_power_level: 100
+      restrict_to_local_users: true
+      max_concurrency: 4
+      retry_count: 3
