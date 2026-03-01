@@ -25,6 +25,8 @@ spec:
             - containerPort: 7880
             - containerPort: 7881
           env:
+            - name: LIVEKIT_PORT
+              value: "7880"
             - name: LIVEKIT_KEYS
               valueFrom:
                 secretKeyRef:

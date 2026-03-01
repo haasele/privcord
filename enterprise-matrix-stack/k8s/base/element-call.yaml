@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: element-call
-          image: vectorim/element-call:latest
+          image: ghcr.io/element-hq/element-call:latest
           ports:
             - containerPort: 80
           env:

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: lk-jwt-service
-          image: ghcr.io/element-hq/lk-jwt-service:v0.4.1
+          image: ghcr.io/element-hq/lk-jwt-service:0.4.1
           ports:
             - containerPort: 8080
           env:

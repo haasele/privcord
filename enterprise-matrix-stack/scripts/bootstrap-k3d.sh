@@ -119,12 +119,19 @@ if [[ -f "$WORKER_AUTOSCALER_DIR/deployment.yaml" ]]; then
   kubectl apply -f "$WORKER_AUTOSCALER_DIR/deployment.yaml"
 fi
 
-# Optional: build and load Synapse+Discordify image into k3d
+# Optional: build and load images into k3d
 if [[ -n "$BUILD_IMAGE" ]]; then
   echo "Building synapse-discordify:latest from repo root..."
   (cd "$REPO_ROOT" && docker build -t synapse-discordify:latest .)
-  echo "Loading image into k3d cluster $CLUSTER_NAME..."
+  echo "Loading synapse-discordify into k3d cluster $CLUSTER_NAME..."
   k3d image import synapse-discordify:latest -c "$CLUSTER_NAME"
+
+  if [[ -f "$REPO_ROOT/worker-autoscaler/Dockerfile" ]]; then
+    echo "Building worker-autoscaler:latest..."
+    (cd "$REPO_ROOT/worker-autoscaler" && docker build -t worker-autoscaler:latest .)
+    echo "Loading worker-autoscaler into k3d cluster $CLUSTER_NAME..."
+    k3d image import worker-autoscaler:latest -c "$CLUSTER_NAME"
+  fi
 fi
 
 echo "Done. Cluster: $CLUSTER_NAME. Use: kubectl get pods -n matrix-stack"
