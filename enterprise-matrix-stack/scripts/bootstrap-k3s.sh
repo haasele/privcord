@@ -72,6 +72,13 @@ fi
 kubectl apply -f "$GENERATED_DIR/synapse-configmap.yaml"
 kubectl apply -f "$GENERATED_DIR/synapse-worker-configmap.yaml"
 kubectl apply -f "$GENERATED_DIR/stack-env-configmap.yaml"
+# Base resources (element-call, lk-jwt-service) are in matrix-stack and reference stack-env; ensure it exists there
+if [[ -n "$DEPLOY_NS" ]] && [[ "$DEPLOY_NS" != "matrix-stack" ]]; then
+  kubectl get configmap stack-env -n "$DEPLOY_NS" -o yaml 2>/dev/null | \
+    sed '/resourceVersion:/d; /uid:/d; /creationTimestamp:/d' | \
+    sed "s/namespace: $DEPLOY_NS/namespace: matrix-stack/" | \
+    kubectl apply -f - 2>/dev/null || true
+fi
 
 # Apply base resources
 echo "Applying base resources..."

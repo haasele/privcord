@@ -1,20 +1,16 @@
 # Enterprise Matrix Stack - Master Configuration
-# Use this file (or the wizard) to define your server, space, federation, and secrets.
-# Then run: python3 scripts/generate_manifests.py --config config/example.yaml --out k8s/generated
+# Example: matrix.haasele.org
+# Run: python3 scripts/generate_manifests.py --config config/example.yaml --out k8s/generated
 
 server:
-  # Public handle/name of the server (e.g. "mycompany", "gaming-club")
-  handle: mycompany
-  # Base domain for this deployment (e.g. "matrix.example.com")
-  domain: matrix.example.com
-  # Optional: custom federation port (default 8448). Used when public + whitelist.
+  handle: haasele
+  domain: matrix.haasele.org
   federation_port: 8448
 
 space:
-  # Auto-created Space (Discord-like "server") settings
-  name: "My Company Chat"
-  description: "Official company Matrix space - use channels for team chat and voice."
-  # default_channel: "general"  # optional; first text channel used if unset
+  name: "haasele Matrix"
+  description: "Matrix space - channels for chat and voice."
+  # default_channel: "general"
 
 federation:
   # "private" = non-federated (no federation at all)
@@ -85,35 +81,28 @@ synapse:
   signing_key_path: /data/signing.key
 
 turn:
-  # TURN server (e.g. coturn) for WebRTC
   enabled: true
-  host: turn.example.com  # or k8s service name for internal
+  host: turn
   port: 3478
   tls_port: 5349
-  shared_secret: ""  # REPLACE or use TURN_SECRET secret
-  # Realm usually matches server domain
-  realm: matrix.example.com
+  shared_secret: ""
+  realm: matrix.haasele.org
 
 livekit:
-  # Element Call / LiveKit SFU backend
   enabled: true
   host: livekit
   port: 7880
-  # API key/secret for LiveKit (from LiveKit cloud or self-hosted)
-  api_key: ""    # REPLACE or use secret
-  api_secret: "" # REPLACE or use secret
-  # WebSocket URL for clients
-  ws_url: wss://livekit.matrix.example.com
+  api_key: ""
+  api_secret: ""
+  ws_url: wss://livekit.matrix.haasele.org
 
 element_call:
-  # Element Call frontend
   enabled: true
-  # URL where Element Call is served
-  base_url: https://call.matrix.example.com
+  base_url: https://call.matrix.haasele.org
 
-# Kubernetes / deployment options (used by generator)
+# Kubernetes (generator); matrix-stack = same namespace as base resources
 deploy:
-  namespace: matrix-mycompany
+  namespace: matrix-stack
   # Image pull secrets if using private registries
   image_pull_secrets: []
   # Resource requests/limits per component (optional overrides)

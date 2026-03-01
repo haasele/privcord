@@ -12,15 +12,15 @@ docker build -t synapse-discordify:latest .
 
 The root `Dockerfile` uses `matrixdotorg/synapse:latest` and installs the `discordify` package from `./discordify`.
 
-## Load into k3d
+## Load into K3s (fully isolated container)
 
-If you use k3d, load the image so the cluster can pull it:
+When using the K3s-in-container setup, `scripts/bootstrap-k3s.sh` builds and imports the image into the in-container cluster. If you build the image yourself (e.g. at repo root), import it so the cluster can use it:
 
 ```bash
-k3d image import synapse-discordify:latest -c matrix-local
+docker save synapse-discordify:latest | k3s ctr -n k8s.io images import -
 ```
 
-Use the same cluster name as in `bootstrap-k3d.sh` (default `matrix-local`). Run this after building and before or after applying the stack; if the image is not in the cluster, Synapse and worker pods will stay in ImagePullBackOff until you import it.
+Run this inside the K3s container after building; if the image is not in the cluster, Synapse and worker pods will stay in ImagePullBackOff until you import it.
 
 ## Fallback
 

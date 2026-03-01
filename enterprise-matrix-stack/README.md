@@ -1,15 +1,18 @@
-# Enterprise Matrix Stack (k3s / k3d)
+# Enterprise Matrix Stack (K3s in container)
 
-Production-ready example for deploying a **Matrix homeserver (Synapse)** with **Discordify module**, **Synapse workers** (scaled by worker-autoscaler), **Element Call**, **LiveKit SFU**, **lk-jwt-service** (MatrixRTC auth), **Redis**, **PostgreSQL** (main + media + optional federated), and **TURN** on **Kubernetes / k3s / k3d**.
+Production-ready example for deploying a **Matrix homeserver (Synapse)** with **Discordify module**, **Synapse workers** (scaled by worker-autoscaler), **Element Call**, **LiveKit SFU**, **lk-jwt-service** (MatrixRTC auth), **Redis**, **PostgreSQL** (main + media + optional federated), and **TURN** on **Kubernetes** — run as a **fully isolated container** (K3s inside the container).
+
+Example server: **matrix.haasele.org** (`config/example.yaml`).
 
 ## What this folder contains
 
-- **config/** – Single master config file (YAML) for server handle, space name/description, private vs public federation, DB passwords, TURN/LiveKit secrets.
-- **k8s/base/** – Kubernetes manifests for the full stack (namespace, secrets template, Postgres, Redis, Synapse, **Synapse workers**, LiveKit, **lk-jwt-service**, Element Call, TURN; optional federated Postgres). Apply generated ConfigMaps (from `scripts/generate_manifests.py`) before base.
-- **scripts/generate_manifests.py** – Reads the config and generates Synapse main + worker config (with Redis and worker_list), ConfigMaps, and optional `.env`.
-- **scripts/bootstrap-k3d.sh** – Create a k3d cluster with 2 nodes and deploy the stack (Connecting branch).
+- **config/** – Master config (YAML): server handle, domain, space, federation, DB/TURN/LiveKit secrets. Example: `matrix.haasele.org`.
+- **k8s/base/** – Kubernetes manifests for the full stack. Apply generated ConfigMaps (from `scripts/generate_manifests.py`) before base.
+- **scripts/generate_manifests.py** – Reads the config and generates Synapse config, ConfigMaps, and optional `.env`.
+- **scripts/bootstrap-k3s.sh** – Used by the K3s-in-container image: generate manifests, create namespace, apply secrets and base, build/load images, deploy the stack.
+- **docker/** – `Dockerfile.ubuntu-k3s` and `entrypoint-k3s.sh` for the single fully isolated container (Docker + K3s inside).
 - **backend/** – Minimal Flask API for the **Create new server** wizard (POST /api/v1/servers).
-- **docs/** – Wizard flow (frontend button → questions → deploy) and deployment guide.
+- **docs/** – Deployment guide and ports/URLs.
 
 ## Quick start
 
