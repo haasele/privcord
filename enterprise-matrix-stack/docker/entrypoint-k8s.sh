@@ -37,11 +37,14 @@ fi
 ./scripts/bootstrap-k3d.sh $RECREATE_ARGS --build-image --cluster-name "$CLUSTER_NAME"
 
 export KUBECONFIG="$(k3d kubeconfig write "$CLUSTER_NAME")"
-# From inside Docker, 0.0.0.0/127.0.0.1 in kubeconfig is the container, not the host. Use host gateway so kubectl works.
+# Patch kubeconfig so kubectl from this container can reach the k3d API server:
+# - Docker bridge: use host gateway (172.17.0.1 etc.). - Host network: use 127.0.0.1 (API server is on host).
 if [[ -f "$KUBECONFIG" ]]; then
-  HOST_IP="$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1}' || ip route | awk '/default/ {print $3}')"
-  if [[ -n "$HOST_IP" ]]; then
-    sed -i "s|https://0.0.0.0:|https://${HOST_IP}:|g; s|https://127.0.0.1:|https://${HOST_IP}:|g" "$KUBECONFIG"
+  GW="$(getent hosts host.docker.internal 2>/dev/null | awk '{print $1}' || ip route 2>/dev/null | awk '/default/ {print $3}')"
+  if [[ -n "$GW" ]] && [[ "$GW" =~ ^172\.(1[7-9]|2[0-9]|3[0-1])\. ]]; then
+    sed -i "s|https://0.0.0.0:|https://${GW}:|g; s|https://127.0.0.1:|https://${GW}:|g" "$KUBECONFIG"
+  else
+    sed -i "s|https://[^:]*:|https://127.0.0.1:|g" "$KUBECONFIG"
   fi
 fi
 echo ""
