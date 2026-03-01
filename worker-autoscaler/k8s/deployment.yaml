@@ -42,8 +42,8 @@ metadata:
 data:
   config.yaml: |
     target:
-      kind: Deployment
-      name: synapse
+      kind: StatefulSet
+      name: synapse-workers
       namespace: matrix-stack
     replicas:
       min: 1
