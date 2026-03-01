@@ -50,7 +50,8 @@ Everything (Docker daemon, KIND cluster, workloads) runs **inside** the containe
 ```bash
 cd enterprise-matrix-stack
 docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
-docker run -it --rm --privileged -p 8008:8008 privcord-kind
+# On cgroup v2 hosts (most recent Linux), add -v /sys/fs/cgroup:/sys/fs/cgroup:rw
+docker run -it --rm --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:rw -p 8008:8008 privcord-kind
 ```
 
 Inside the container shell, run `kubectl get pods -n matrix-stack`. To reach Synapse from your PC, in that same shell run:

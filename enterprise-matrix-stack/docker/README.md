@@ -18,13 +18,21 @@ docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
 
 ### Run
 
+On **cgroup v2** hosts (most recent Linux distros), mount cgroups and use the host cgroup namespace so KIND’s node containers can start:
+
 ```bash
-docker run -it --rm --privileged privcord-kind
+docker run -it --rm --privileged \
+  --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+  privcord-kind
 ```
 
-- **`--privileged`** — required for Docker-in-Docker (the container runs its own Docker daemon and KIND cluster).
+On **cgroup v1** hosts, `--privileged` alone may be enough; if KIND fails with cgroup errors, add `--cgroupns=host` and `-v /sys/fs/cgroup:/sys/fs/cgroup:rw`.
+
+- **`--privileged`** — required for Docker-in-Docker.
+- **`-v /sys/fs/cgroup:/sys/fs/cgroup:rw`** — required on cgroup v2 so the inner Docker/KIND can use cgroups (avoids “failed to enable controllers” / “no such file or directory”).
 - Optional: mount the repo to avoid clone: `-v /path/to/API-Addon:/workspace/privcord`.
-- Optional: expose ports for port-forward from the host, e.g. `-p 8008:8008` then inside the container run `kubectl port-forward -n matrix-stack svc/synapse 8008:8008` and use http://localhost:8008 on your PC.
+- Optional: expose ports, e.g. `-p 8008:8008` then inside the container run `kubectl port-forward -n matrix-stack svc/synapse 8008:8008`.
 
 The container will:
 

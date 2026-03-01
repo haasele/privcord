@@ -7,10 +7,13 @@ REPO_URL="${REPO_URL:-https://github.com/haasele/privcord.git}"
 CLONE_DIR="${CLONE_DIR:-/workspace/privcord}"
 CLUSTER_NAME="${CLUSTER_NAME:-matrix-local}"
 
-# Start Docker daemon (Docker-in-Docker); storage-driver vfs works without extra privileges
+# Start Docker daemon (Docker-in-Docker). On cgroup v2 hosts, run the container with:
+#   -v /sys/fs/cgroup:/sys/fs/cgroup:rw
+# so the inner Docker/KIND can use cgroups.
 if ! docker info &>/dev/null; then
   echo "Starting Docker daemon inside container..."
-  dockerd --storage-driver=vfs &
+  # cgroupfs driver often works better than systemd when nesting; vfs avoids overlay issues
+  dockerd --storage-driver=vfs --exec-opt native.cgroupdriver=cgroupfs &
   for i in {1..30}; do
     if docker info &>/dev/null; then break; fi
     [[ $i -eq 30 ]] && { echo "Docker daemon did not start."; exit 1; }
