@@ -83,6 +83,17 @@ done
 # Apply namespace first
 kubectl apply -f "$BASE_DIR/namespace.yaml"
 
+# Create deploy namespace from config if different (e.g. matrix-mycompany)
+DEPLOY_NS="$(python3 -c "
+import yaml
+with open('$CONFIG') as f:
+    c = yaml.safe_load(f)
+print(c.get('deploy', {}).get('namespace', 'matrix-stack'))
+" 2>/dev/null)"
+if [[ -n "$DEPLOY_NS" ]] && [[ "$DEPLOY_NS" != "matrix-stack" ]]; then
+  kubectl create namespace "$DEPLOY_NS" 2>/dev/null || true
+fi
+
 # Apply secrets (must exist; copy from secrets.example.yaml and fill, or create minimal secrets)
 if [[ -f "$BASE_DIR/secrets.yaml" ]]; then
   kubectl apply -f "$BASE_DIR/secrets.yaml"
