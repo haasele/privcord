@@ -22,9 +22,15 @@ spec:
             - containerPort: 80
           env:
             - name: HOMESERVER_URL
-              value: "https://CHANGEME_DOMAIN"
+              valueFrom:
+                configMapKeyRef:
+                  name: stack-env
+                  key: HOMESERVER_URL
             - name: LIVEKIT_URL
-              value: "wss://CHANGEME_LIVEKIT_WS"
+              valueFrom:
+                configMapKeyRef:
+                  name: stack-env
+                  key: LIVEKIT_WS_URL
           resources:
             requests:
               memory: "64Mi"

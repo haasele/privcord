@@ -1,0 +1,68 @@
+# MatrixRTC auth: issues LiveKit JWTs for Element Call (element-hq/lk-jwt-service)
+# Clients get tokens via this service; configure Synapse/Element Call to use it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lk-jwt-service
+  namespace: matrix-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lk-jwt-service
+  template:
+    metadata:
+      labels:
+        app: lk-jwt-service
+    spec:
+      containers:
+        - name: lk-jwt-service
+          image: ghcr.io/element-hq/lk-jwt-service:v0.4.1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: LK_JWT_PORT
+              value: "8080"
+            - name: LIVEKIT_URL
+              value: "http://livekit:7880"
+            - name: LIVEKIT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: livekit-credentials
+                  key: api_key
+            - name: LIVEKIT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: livekit-credentials
+                  key: api_secret
+            - name: LIVEKIT_LOCAL_HOMESERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: stack-env
+                  key: LIVEKIT_LOCAL_HOMESERVERS
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lk-jwt-service
+  namespace: matrix-stack
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: lk-jwt-service

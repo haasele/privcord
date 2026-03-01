@@ -69,7 +69,7 @@ data:
     redis:
       address: redis:6379
     keys:
-      # In production these come from Secret; placeholder
+      # Overridden by deployment env (LIVEKIT_KEYS, LIVEKIT_SECRET from livekit-credentials Secret)
       API_KEY: changeme
       API_SECRET: changeme
 ---

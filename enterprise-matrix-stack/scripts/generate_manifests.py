@@ -34,14 +34,27 @@ def build_synapse_homeserver(config: dict) -> str:
     mode = federation.get("mode", "private")
     db = config.get("databases", {}).get("postgres_main", {})
     db_pass = db.get("password") or "CHANGEME_POSTGRES_MAIN_PASSWORD"
+    redis_cfg = config.get("databases", {}).get("redis", {})
+    redis_host = redis_cfg.get("host", "redis")
+    redis_port = redis_cfg.get("port", 6379)
+    redis_pass = redis_cfg.get("password") or ""
     discordify = config.get("synapse", {}).get("discordify", {})
     space = config.get("space", {})
+
+    # Worker names for autoscaling (worker_list on main; workers use generic_worker_0 .. generic_worker_9)
+    worker_names = [f"generic_worker_{i}" for i in range(10)]
+    worker_list_yaml = yaml.dump(
+        [{"worker_name": w, "worker_type": "generic_worker"} for w in worker_names],
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    worker_list_indent = "".join("  " + line + "\n" for line in worker_list_yaml.strip().split("\n"))
 
     # Build discordify module config (space name/description are applied at runtime or via client)
     modules_yaml = yaml.dump(
         [
             {
-                "module": "discordify-module.DiscordifySpacesModule",
+                "module": "discordify_module.module.DiscordifySpacesModule",
                 "config": {
                     "channels": discordify.get("channels", [{"name": "general", "type": "text"}, {"name": "Voice", "type": "voice"}]),
                     "roles": discordify.get("roles", []),
@@ -82,6 +95,14 @@ database:
     cp_min: 5
     cp_max: 10
 
+redis:
+  enabled: true
+  host: {redis_host}
+  port: {redis_port}
+  password: "{redis_pass}"
+
+worker_list:
+{worker_list_indent}
 media_store_path: "/data/media_store"
 log_config: "/config/log.config"
 signing_key_path: "/data/signing.key"
@@ -89,6 +110,75 @@ signing_key_path: "/data/signing.key"
 modules:
 {modules_yaml}
 """
+
+
+def build_synapse_worker_config(config: dict) -> str:
+    """Build worker config (same DB/redis as main, plus worker_app/worker_name/listeners)."""
+    server = config.get("server", {})
+    domain = server.get("domain", "CHANGEME_DOMAIN")
+    db = config.get("databases", {}).get("postgres_main", {})
+    db_pass = db.get("password") or "CHANGEME_POSTGRES_MAIN_PASSWORD"
+    redis_cfg = config.get("databases", {}).get("redis", {})
+    redis_host = redis_cfg.get("host", "redis")
+    redis_port = redis_cfg.get("port", 6379)
+    redis_pass = redis_cfg.get("password") or ""
+    # Worker name from env so each pod can be generic_worker_0, generic_worker_1, etc.
+    return f"""# Generated worker config - do not edit by hand
+# Worker name is set via WORKER_NAME env (e.g. generic_worker_0)
+server_name: "{domain}"
+public_baseurl: "https://{domain}/"
+
+database:
+  name: psycopg2
+  args:
+    database: {db.get("database", "synapse")}
+    user: {db.get("user", "synapse")}
+    password: "{db_pass}"
+    host: {db.get("host", "postgres-main")}
+    port: {db.get("port", 5432)}
+    cp_min: 2
+    cp_max: 5
+
+redis:
+  enabled: true
+  host: {redis_host}
+  port: {redis_port}
+  password: "{redis_pass}"
+
+signing_key_path: "/data/signing.key"
+media_store_path: "/data/media_store"
+
+worker_app: synapse.app.generic_worker
+worker_name: "${{WORKER_NAME}}"
+worker_listeners:
+  - type: http
+    port: 8083
+    x_forwarded: true
+    resources:
+      - names: [client, federation]
+"""
+
+
+def build_stack_env_configmap(config: dict) -> dict:
+    """Build ConfigMap with domain/URLs for element-call, lk-jwt-service (no secrets)."""
+    server = config.get("server", {})
+    domain = server.get("domain", "CHANGEME_DOMAIN")
+    livekit = config.get("livekit", {})
+    ws_url = livekit.get("ws_url") or f"wss://livekit.{domain}"
+    element_call = config.get("element_call", {})
+    base_url = element_call.get("base_url") or f"https://call.{domain}"
+    namespace = config.get("deploy", {}).get("namespace", "matrix-stack")
+    return {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {"name": "stack-env", "namespace": namespace},
+        "data": {
+            "HOMESERVER_URL": f"https://{domain}/",
+            "LIVEKIT_WS_URL": ws_url,
+            "LIVEKIT_LOCAL_HOMESERVERS": domain,
+            "ELEMENT_CALL_BASE_URL": base_url,
+        },
+    }
 
 
 def build_env_file(config: dict) -> str:
@@ -132,20 +222,42 @@ def main() -> None:
 
     if args.out:
         args.out.mkdir(parents=True, exist_ok=True)
+        namespace = config.get("deploy", {}).get("namespace", "matrix-stack")
         homeserver = build_synapse_homeserver(config)
         (args.out / "synapse-homeserver.yaml").write_text(homeserver)
         print(f"Wrote {args.out / 'synapse-homeserver.yaml'}")
-        # Optional: write a small kustomize patch or ConfigMap fragment
+
+        worker_config = build_synapse_worker_config(config)
+        (args.out / "synapse-worker.yaml").write_text(worker_config)
+        print(f"Wrote {args.out / 'synapse-worker.yaml'}")
+
         cm = {
             "apiVersion": "v1",
             "kind": "ConfigMap",
-            "metadata": {"name": "synapse-config", "namespace": "matrix-stack"},
+            "metadata": {"name": "synapse-config", "namespace": namespace},
             "data": {"homeserver.yaml": homeserver},
         }
         (args.out / "synapse-configmap.yaml").write_text(
             "---\n" + yaml.dump(cm, default_flow_style=False, allow_unicode=True, sort_keys=False)
         )
         print(f"Wrote {args.out / 'synapse-configmap.yaml'}")
+
+        cm_worker = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {"name": "synapse-worker-config", "namespace": namespace},
+            "data": {"worker.yaml": worker_config},
+        }
+        (args.out / "synapse-worker-configmap.yaml").write_text(
+            "---\n" + yaml.dump(cm_worker, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        )
+        print(f"Wrote {args.out / 'synapse-worker-configmap.yaml'}")
+
+        stack_env = build_stack_env_configmap(config)
+        (args.out / "stack-env-configmap.yaml").write_text(
+            "---\n" + yaml.dump(stack_env, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        )
+        print(f"Wrote {args.out / 'stack-env-configmap.yaml'}")
 
 
 if __name__ == "__main__":
