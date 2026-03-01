@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run KIND (Kubernetes) fully inside this container. No host Docker socket.
-# Requires: docker run --privileged (Docker-in-Docker).
+# WARNING: KIND's control plane often fails to become healthy in Docker-in-Docker
+# (kube-apiserver/controller-manager/scheduler connection refused). Use the K3s
+# image instead: docker build -f docker/Dockerfile.ubuntu-k3s -t privcord-k3s .
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/haasele/privcord.git}"
@@ -38,7 +40,8 @@ if [[ ! -f "$STACK_DIR/scripts/bootstrap-kind.sh" ]]; then
 fi
 
 cd "$STACK_DIR"
-echo "Running KIND bootstrap (cluster: $CLUSTER_NAME, fully inside this container) ..."
+echo "Running KIND bootstrap (cluster: $CLUSTER_NAME)."
+echo "If control-plane never becomes healthy, use the K3s image: privcord-k3s (see docker/README.md)."
 RECREATE_ARGS=""
 if grep -q -- '--recreate' scripts/bootstrap-kind.sh 2>/dev/null; then
   RECREATE_ARGS="--recreate"
