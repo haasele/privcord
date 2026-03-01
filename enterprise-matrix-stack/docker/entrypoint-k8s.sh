@@ -23,12 +23,12 @@ fi
 
 cd "$STACK_DIR"
 echo "Running k3d bootstrap (cluster: $CLUSTER_NAME) ..."
-# Use --recreate only if the bootstrap script supports it (e.g. this repo); upstream may not.
-if ./scripts/bootstrap-k3d.sh --help 2>/dev/null | grep -q -- --recreate; then
-  ./scripts/bootstrap-k3d.sh --recreate --build-image --cluster-name "$CLUSTER_NAME"
-else
-  ./scripts/bootstrap-k3d.sh --build-image --cluster-name "$CLUSTER_NAME"
+# Pass --recreate if bootstrap supports it (this repo); omit for upstream clone.
+RECREATE_ARGS=""
+if grep -q -- '--recreate' scripts/bootstrap-k3d.sh 2>/dev/null; then
+  RECREATE_ARGS="--recreate"
 fi
+./scripts/bootstrap-k3d.sh $RECREATE_ARGS --build-image --cluster-name "$CLUSTER_NAME"
 
 export KUBECONFIG="$(k3d kubeconfig write "$CLUSTER_NAME")"
 echo ""
