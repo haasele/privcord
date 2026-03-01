@@ -1,55 +1,47 @@
 # Run the stack in an Ubuntu container (Kubernetes)
 
-Two options: **fully isolated (KIND)** so nothing runs on your PC, or **k3d** with the cluster on the host.
+Three options: **fully isolated with K3s** (recommended), **fully isolated with KIND** (often fails in DinD), or **k3d** with the cluster on the host.
 
 ---
 
-## Option 1: Fully isolated (KIND) — recommended
+## Option 1: Fully isolated — K3s (recommended)
 
-**Everything runs inside the container**: Docker daemon, KIND cluster, and all workloads. Your PC is not used for the cluster.
+**Everything runs inside the container**: Docker daemon (for building images only), **K3s server** (runs in this container, no nested node), and all workloads. No KIND — avoids control-plane timeouts in Docker-in-Docker.
 
 ### Build
 
 From `enterprise-matrix-stack/`:
 
 ```bash
-docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
+docker build -f docker/Dockerfile.ubuntu-k3s -t privcord-k3s .
 ```
 
 ### Run
 
-On **cgroup v2** hosts (most recent Linux distros), mount cgroups and use the host cgroup namespace so KIND’s node containers can start:
+On **cgroup v2** hosts, use the same cgroup mount as for any DinD:
 
 ```bash
 docker run -it --rm --privileged \
   --cgroupns=host \
   -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-  privcord-kind
+  privcord-k3s
 ```
 
-On **cgroup v1** hosts, `--privileged` alone may be enough; if KIND fails with cgroup errors, add `--cgroupns=host` and `-v /sys/fs/cgroup:/sys/fs/cgroup:rw`.
+Optional: `-v /path/to/API-Addon:/workspace/privcord` to use your repo; `-p 8008:8008` then inside the container run `kubectl port-forward -n matrix-stack svc/synapse 8008:8008` to reach Synapse from your PC.
 
-- **`--privileged`** — required for Docker-in-Docker.
-- **`-v /sys/fs/cgroup:/sys/fs/cgroup:rw`** — required on cgroup v2 so the inner Docker/KIND can use cgroups (avoids “failed to enable controllers” / “no such file or directory”).
-- Optional: mount the repo to avoid clone: `-v /path/to/API-Addon:/workspace/privcord`.
-- Optional: expose ports, e.g. `-p 8008:8008` then inside the container run `kubectl port-forward -n matrix-stack svc/synapse 8008:8008`.
+The container will: start Docker (for builds), start **K3s server** in this container, clone repo, run `bootstrap-k3s.sh --build-image`, then drop to a shell. Run `kubectl get pods -n matrix-stack`.
 
-The container will:
+---
 
-1. Start the Docker daemon inside the container.
-2. Clone the git repo (or use the mounted path).
-3. Run `bootstrap-kind.sh --recreate --build-image` to create a KIND cluster and deploy the stack.
-4. Drop you into a shell; run `kubectl get pods -n matrix-stack`. The cluster is **only** inside this container.
+## Option 1b: Fully isolated — KIND (alternative)
 
-To reach services from your PC: keep the container running, then in another terminal run port-forward **inside** the container and publish the port:
+**Everything inside the container** via KIND. Often fails with “control plane not healthy” in Docker-in-Docker; use Option 1 (K3s) if that happens.
+
+### Build & run
 
 ```bash
-# Terminal 1: run container with port 8008 published
-docker run -it --rm --privileged -p 8008:8008 privcord-kind
-
-# Inside the container shell:
-kubectl port-forward -n matrix-stack svc/synapse 8008:8008
-# Then on your PC: http://localhost:8008
+docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
+docker run -it --rm --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw privcord-kind
 ```
 
 ---

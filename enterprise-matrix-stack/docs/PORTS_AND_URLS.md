@@ -43,24 +43,28 @@ docker compose -f docker-compose.e2e.yml down
 
 ---
 
-## 2. Fully isolated: KIND inside the container
+## 2. Fully isolated: K3s inside the container (recommended)
 
-Everything (Docker daemon, KIND cluster, workloads) runs **inside** the container. Your PC is not used.
+K3s runs in the **same** container (no KIND/node nesting). Avoids control-plane timeouts common with KIND in Docker-in-Docker.
 
 ```bash
 cd enterprise-matrix-stack
-docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
-# On cgroup v2 hosts (most recent Linux), add -v /sys/fs/cgroup:/sys/fs/cgroup:rw
-docker run -it --rm --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:rw -p 8008:8008 privcord-kind
+docker build -f docker/Dockerfile.ubuntu-k3s -t privcord-k3s .
+docker run -it --rm --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -p 8008:8008 privcord-k3s
 ```
 
-Inside the container shell, run `kubectl get pods -n matrix-stack`. To reach Synapse from your PC, in that same shell run:
+Inside the container: `kubectl get pods -n matrix-stack`. To reach Synapse from your PC: `kubectl port-forward -n matrix-stack svc/synapse 8008:8008`, then http://localhost:8008.
+
+---
+
+## 2b. Fully isolated: KIND inside the container
+
+KIND runs inside the container; the control plane often fails to become healthy in DinD. Prefer the K3s option above.
 
 ```bash
-kubectl port-forward -n matrix-stack svc/synapse 8008:8008
+docker build -f docker/Dockerfile.ubuntu-kind -t privcord-kind .
+docker run -it --rm --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -p 8008:8008 privcord-kind
 ```
-
-Then open http://localhost:8008 on your PC (because you used `-p 8008:8008`).
 
 ---
 
