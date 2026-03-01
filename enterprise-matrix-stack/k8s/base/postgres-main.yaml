@@ -19,6 +19,15 @@ spec:
           image: postgres:15-alpine
           ports:
             - containerPort: 5432
+          command: ["docker-entrypoint.sh"]
+          args:
+            - "postgres"
+            - "-c"
+            - "wal_level=replica"
+            - "-c"
+            - "max_wal_senders=3"
+            - "-c"
+            - "max_replication_slots=3"
           env:
             - name: POSTGRES_DB
               value: synapse
@@ -29,9 +38,16 @@ spec:
                 secretKeyRef:
                   name: postgres-main-credentials
                   key: password
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-main-credentials
+                  key: replication_password
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
           resources:
             requests:
               memory: "256Mi"
@@ -53,6 +69,13 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: postgres-main-data
+        - name: init-scripts
+          configMap:
+            name: postgres-main-config
+            defaultMode: 0755
+            items:
+              - key: create-replication-user.sh
+                path: create-replication-user.sh
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

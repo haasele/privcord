@@ -5,11 +5,16 @@ kind: Kustomization
 namespace: matrix-stack
 resources:
   - namespace.yaml
+  - postgres-main-config.yaml
   - postgres-main.yaml
+  - postgres-main-replica.yaml
   - postgres-media.yaml
+  - postgres-metadata.yaml
   - redis.yaml
   - synapse.yaml
+  - synapse-workers.yaml
   - livekit.yaml
+  - lk-jwt-service.yaml
   - element-call.yaml
   - turn.yaml
 # Uncomment if using federated Postgres:

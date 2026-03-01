@@ -1,0 +1,97 @@
+# Postgres streaming replica for main DB (2-node replication).
+# Init container runs pg_basebackup from primary (postgres-main); main container runs standby.
+# Synapse continues to use postgres-main (primary) for writes; replica can be used for read scaling if configured.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-main-replica
+  namespace: matrix-stack
+spec:
+  serviceName: postgres-main-replica
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-main-replica
+  template:
+    metadata:
+      labels:
+        app: postgres-main-replica
+    spec:
+      securityContext:
+        runAsUser: 999
+        fsGroup: 999
+      initContainers:
+        - name: pg-basebackup
+          image: postgres:15-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until pg_isready -h postgres-main -U replicator 2>/dev/null; do echo "Waiting for primary..."; sleep 2; done
+              PGPASSWORD="$REPLICATION_PASSWORD" pg_basebackup -D /var/lib/postgresql/data -Fp -R -h postgres-main -U replicator -X stream -v
+          env:
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-main-credentials
+                  key: replication_password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "replicator"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "replicator"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-main-replica-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-main-replica-data
+  namespace: matrix-stack
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-main-replica
+  namespace: matrix-stack
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres-main-replica
+  clusterIP: None
