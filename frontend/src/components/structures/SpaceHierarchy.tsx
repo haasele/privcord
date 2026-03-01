@@ -396,6 +396,8 @@ export const showRoom = (cli: MatrixClient, hierarchy: RoomHierarchy, roomId: st
     }
 
     const roomAlias = getDisplayAliasForAliasSet(room?.canonical_alias ?? "", room?.aliases ?? []) || undefined;
+    const isVoiceOrVideoRoom =
+        roomType === RoomType.ElementVideo || roomType === RoomType.UnstableCall;
 
     defaultDispatcher.dispatch<ViewRoomPayload>({
         action: Action.ViewRoom,
@@ -403,6 +405,7 @@ export const showRoom = (cli: MatrixClient, hierarchy: RoomHierarchy, roomId: st
         room_alias: roomAlias,
         room_id: roomId,
         via_servers: Array.from(hierarchy.viaMap.get(roomId) || []),
+        view_call: isVoiceOrVideoRoom ? true : undefined,
         oob_data: {
             avatarUrl: room?.avatar_url,
             // XXX: This logic is duplicated from the JS SDK which would normally decide what the name is.
