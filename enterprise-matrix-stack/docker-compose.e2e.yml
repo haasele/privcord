@@ -97,7 +97,7 @@ services:
       PORT: "5000"
       DATABASE_URL_METADATA: "postgresql://metadata:metadata-e2e-secret@postgres-metadata:5432/metadata"
     volumes:
-      - .:/stack:ro
+      - .:/stack
     ports:
       - "5000:5000"
     depends_on:
