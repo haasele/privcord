@@ -60,7 +60,7 @@ export const PersistentCallBar: React.FC = () => {
         ? MatrixClientPeg.get()?.getRoom(callToShow.roomId)
         : null;
     const roomName = useEventEmitterState(
-        room ?? ({} as any),
+        room ?? undefined,
         RoomEvent.Name,
         () => room?.name ?? callToShow?.roomId ?? "",
     );

@@ -107,14 +107,28 @@ class DiscordifySpacesModule:
             roles=parsed_roles,
         )
 
+    async def _get_state_event(self, room_id: str, event_type: str, state_key: str) -> Optional[Any]:
+        events = await self.api.get_state_events_in_room(room_id, [(event_type, state_key)])
+        for ev in events:
+            if ev.type == event_type and ev.state_key == state_key:
+                return ev
+        return None
+
+    async def _send_state_event(self, room_id: str, sender: str, event_type: str, state_key: str, content: dict) -> None:
+        await self.api.create_and_send_event_into_room({
+            "type": event_type,
+            "room_id": room_id,
+            "sender": sender,
+            "state_key": state_key,
+            "content": content,
+        })
+
     async def on_new_event(self, event: Any, state_events: Any) -> None:
-        """Called after an event is persisted. Initialize space when m.room.create has type m.space; apply banlist changes."""
         room_id = getattr(event, "room_id", None)
         if not room_id:
             return
         content = getattr(event, "content", None) or {}
 
-        # Banlist updated: apply bans/unbans to space and all children
         if event.type == BANLIST_EVENT_TYPE and getattr(event, "state_key", "") == "":
             await self._apply_banlist_changes(room_id, event, state_events)
             return
@@ -130,41 +144,34 @@ class DiscordifySpacesModule:
             if not creator.endswith(f":{self.server_name}"):
                 return
 
-        # Idempotenz prüfen
-        existing = await self.api.get_state_event(
-            room_id, INITIALIZED_EVENT_TYPE, ""
-        )
+        existing = await self._get_state_event(room_id, INITIALIZED_EVENT_TYPE, "")
         if existing:
             return
 
         logger.info("Initialisiere Space %s", room_id)
-
-        asyncio.create_task(self._initialize_space(room_id, creator))
+        from twisted.internet import defer, reactor
+        defer.ensureDeferred(self._initialize_space(room_id, creator))
 
     async def check_event_allowed(
         self, event: Any, state_events: Any
     ) -> Tuple[bool, Optional[dict]]:
-        """Reject events from users who are currently timed out in this space."""
         sender = getattr(event, "sender", None)
         if not sender:
             return True, None
         room_id = getattr(event, "room_id", None)
         if not room_id:
             return True, None
-        # Resolve space id: room is the space or we get parent from state
         space_id = room_id
         if state_events:
             for key in state_events:
                 if isinstance(key, (list, tuple)) and len(key) >= 2 and key[0] == "m.space.parent":
                     space_id = key[1]
                     break
-        timeout_state = await self.api.get_state_event(
-            space_id, TIMEOUT_EVENT_TYPE, sender
-        )
-        if not timeout_state or not getattr(timeout_state, "content", None):
+        timeout_ev = await self._get_state_event(space_id, TIMEOUT_EVENT_TYPE, sender)
+        if not timeout_ev:
             return True, None
-        content = timeout_state.content
-        expires_ts = content.get("expires_ts") or 0
+        tc = getattr(timeout_ev, "content", {}) or {}
+        expires_ts = tc.get("expires_ts") or 0
         now_ms = int(time.time() * 1000)
         if now_ms < expires_ts:
             return False, None
@@ -173,7 +180,6 @@ class DiscordifySpacesModule:
     async def _apply_banlist_changes(
         self, space_id: str, event: Any, state_events: Any
     ) -> None:
-        """When banlist state is updated, ban/unban users in the space and all child rooms."""
         try:
             new_entries = (event.content or {}).get("entries", [])
             prev = getattr(event, "unsigned", None) or {}
@@ -193,25 +199,26 @@ class DiscordifySpacesModule:
                 reason = entry.get("reason", "")
                 for rid in rooms_to_update:
                     try:
-                        await self.api.send_state_event(
+                        await self.api.update_room_membership(
+                            sender=event.sender,
+                            target=user_id,
                             room_id=rid,
-                            event_type="m.room.member",
-                            state_key=user_id,
-                            content={"membership": "ban", "reason": reason},
+                            new_membership="ban",
+                            content={"reason": reason},
                         )
                     except Exception:
-                        logger.warning("Failed to ban %s in %s: %s", user_id, rid)
+                        logger.warning("Failed to ban %s in %s", user_id, rid)
             for user_id in removed:
                 for rid in rooms_to_update:
                     try:
-                        await self.api.send_state_event(
+                        await self.api.update_room_membership(
+                            sender=event.sender,
+                            target=user_id,
                             room_id=rid,
-                            event_type="m.room.member",
-                            state_key=user_id,
-                            content={"membership": "leave"},
+                            new_membership="leave",
                         )
                     except Exception:
-                        logger.warning("Failed to unban %s in %s: %s", user_id, rid)
+                        logger.warning("Failed to unban %s in %s", user_id, rid)
         except Exception:
             logger.exception("Failed to apply banlist changes in %s", space_id)
 
@@ -223,26 +230,12 @@ class DiscordifySpacesModule:
                 created.append(room_id)
 
             if self.config.space_name:
-                await self.api.send_state_event(
-                    room_id=space_id,
-                    event_type="m.room.name",
-                    state_key="",
-                    content={"name": self.config.space_name},
-                )
+                await self._send_state_event(space_id, creator, "m.room.name", "", {"name": self.config.space_name})
             if self.config.space_avatar:
-                await self.api.send_state_event(
-                    room_id=space_id,
-                    event_type="m.room.avatar",
-                    state_key="",
-                    content={"url": self.config.space_avatar},
-                )
+                await self._send_state_event(space_id, creator, "m.room.avatar", "", {"url": self.config.space_avatar})
             if self.config.roles:
-                await self.api.send_state_event(
-                    room_id=space_id,
-                    event_type="com.Discordify.Spaces_Module.roles",
-                    state_key="",
-                    content={"roles": self.config.roles},
-                )
+                await self._send_state_event(space_id, creator, "com.Discordify.Spaces_Module.roles", "", {"roles": self.config.roles})
+
             default_room_id = None
             for i, ch in enumerate(self.config.channels):
                 if i < len(created) and created[i] and ch.get("default"):
@@ -254,19 +247,10 @@ class DiscordifySpacesModule:
                         default_room_id = created[i]
                         break
             if default_room_id:
-                await self.api.send_state_event(
-                    room_id=space_id,
-                    event_type="com.Discordify.Spaces_Module.default_channel",
-                    state_key="",
-                    content={"room_id": default_room_id},
-                )
+                await self._send_state_event(space_id, creator, "com.Discordify.Spaces_Module.default_channel", "", {"room_id": default_room_id})
 
-            await self.api.send_state_event(
-                room_id=space_id,
-                event_type=INITIALIZED_EVENT_TYPE,
-                state_key="",
-                content={"initialized": True},
-            )
+            await self._send_state_event(space_id, creator, INITIALIZED_EVENT_TYPE, "", {"initialized": True})
+            logger.info("Space %s initialisiert mit %d Kanälen", space_id, len([c for c in created if c]))
 
         except Exception:
             logger.exception("Fehler bei Space-Initialisierung %s", space_id)
@@ -298,99 +282,52 @@ class DiscordifySpacesModule:
         encryption = channel.get("encryption", self.config.encryption)
 
         initial_state = [
-            {
-                "type": "m.room.join_rules",
-                "state_key": "",
-                "content": {"join_rule": join_rule},
-            },
-            {
-                "type": "m.room.history_visibility",
-                "state_key": "",
-                "content": {"history_visibility": history_visibility},
-            },
+            {"type": "m.room.join_rules", "state_key": "", "content": {"join_rule": join_rule}},
+            {"type": "m.room.history_visibility", "state_key": "", "content": {"history_visibility": history_visibility}},
         ]
 
         if encryption:
-            initial_state.append(
-                {
-                    "type": "m.room.encryption",
-                    "state_key": "",
-                    "content": {"algorithm": "m.megolm.v1.aes-sha2"},
-                }
-            )
+            initial_state.append({"type": "m.room.encryption", "state_key": "", "content": {"algorithm": "m.megolm.v1.aes-sha2"}})
 
         if channel.get("topic"):
-            initial_state.append(
-                {
-                    "type": "m.room.topic",
-                    "state_key": "",
-                    "content": {"topic": channel["topic"]},
-                }
-            )
+            initial_state.append({"type": "m.room.topic", "state_key": "", "content": {"topic": channel["topic"]}})
 
         if ctype == "voice":
-            initial_state.append(
-                {
-                    "type": "m.room.type",
-                    "state_key": "",
-                    "content": {"type": self.config.voice_room_type},
-                }
-            )
+            initial_state.append({"type": "m.room.type", "state_key": "", "content": {"type": self.config.voice_room_type}})
 
-        new_room_id = await self.api.create_room(
-            creator=creator,
-            name=name,
-            initial_state=initial_state,
-        )
+        room_config = {
+            "name": name,
+            "preset": "public_chat",
+            "initial_state": initial_state,
+        }
+
+        result = await self.api.create_room(user_id=creator, config=room_config)
+        new_room_id = result[0]
 
         child_content: Dict[str, Any] = {"via": [self.server_name], "order": str(channel.get("order", 0))}
         if channel.get("category"):
             child_content["category"] = channel["category"]
 
-        await self.api.send_state_event(
-            room_id=space_id,
-            event_type="m.space.child",
-            state_key=new_room_id,
-            content=child_content,
-        )
+        await self._send_state_event(space_id, creator, "m.space.child", new_room_id, child_content)
 
         if channel.get("nsfw"):
-            await self.api.send_state_event(
-                room_id=new_room_id,
-                event_type="com.Discordify.Spaces_Module.nsfw",
-                state_key="",
-                content={"nsfw": True},
-            )
+            await self._send_state_event(new_room_id, creator, "com.Discordify.Spaces_Module.nsfw", "", {"nsfw": True})
 
-        await self.api.send_state_event(
-            room_id=new_room_id,
-            event_type="m.space.parent",
-            state_key=space_id,
-            content={"via": [self.server_name], "canonical": True},
-        )
+        await self._send_state_event(new_room_id, creator, "m.space.parent", space_id, {"via": [self.server_name], "canonical": True})
 
         await self._ensure_admin_power(new_room_id, creator)
         return new_room_id
 
     async def _ensure_admin_power(self, room_id: str, creator: str):
-        current_pl = await self.api.get_state_event(
-            room_id, "m.room.power_levels", ""
-        )
-
-        if not current_pl:
+        pl_event = await self._get_state_event(room_id, "m.room.power_levels", "")
+        if not pl_event:
             return
 
-        content = dict(current_pl.content)
+        content = dict(getattr(pl_event, "content", {}) or {})
         users = dict(content.get("users", {}))
         current_level = users.get(creator, 0)
 
         if current_level < self.config.admin_power_level:
             users[creator] = self.config.admin_power_level
             content["users"] = users
-
-            await self.api.send_state_event(
-                room_id=room_id,
-                event_type="m.room.power_levels",
-                state_key="",
-                content=content,
-            )
+            await self._send_state_event(room_id, creator, "m.room.power_levels", "", content)
