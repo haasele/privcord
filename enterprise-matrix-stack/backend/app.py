@@ -18,6 +18,16 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
+
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get("Origin", "")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
+
 STACK_DIR = Path(os.environ.get("STACK_DIR", Path(__file__).resolve().parent.parent))
 ENABLE_DEPLOY = os.environ.get("ENABLE_DEPLOY", "").strip().lower() in ("1", "true", "yes")
 CONFIG_DIR = STACK_DIR / "config"
