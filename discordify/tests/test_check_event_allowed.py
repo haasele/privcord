@@ -2,12 +2,13 @@
 Unit tests for DiscordifySpacesModule.check_event_allowed (timeout logic).
 """
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from discordify_module.module import DiscordifySpacesModule
 from discordify_module.module import DiscordifySpacesConfig
+from discordify_module.module import TIMEOUT_EVENT_TYPE
 
 
 @pytest.fixture
@@ -49,22 +50,25 @@ async def test_check_event_allowed_no_sender(minimal_config, mock_api):
 @pytest.mark.asyncio
 async def test_check_event_allowed_no_timeout_state(minimal_config, mock_api):
     """No timeout state for user -> allow."""
-    mock_api.get_state_event = AsyncMock(return_value=None)
+    mock_api.get_state_events_in_room = AsyncMock(return_value=[])
     module = DiscordifySpacesModule(minimal_config, mock_api)
     event = MagicMock()
     event.sender = "@user:test.server"
     event.room_id = "!room:test"
     allowed, _ = await module.check_event_allowed(event, None)
     assert allowed is True
-    mock_api.get_state_event.assert_called_once()
+    mock_api.get_state_events_in_room.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_check_event_allowed_timeout_expired(minimal_config, mock_api):
     """Timeout state with expires_ts in the past -> allow."""
-    mock_api.get_state_event = AsyncMock(return_value=MagicMock(
+    timeout_ev = MagicMock(
+        type=TIMEOUT_EVENT_TYPE,
+        state_key="@user:test.server",
         content={"expires_ts": 1},
-    ))
+    )
+    mock_api.get_state_events_in_room = AsyncMock(return_value=[timeout_ev])
     module = DiscordifySpacesModule(minimal_config, mock_api)
     event = MagicMock()
     event.sender = "@user:test.server"
@@ -78,9 +82,12 @@ async def test_check_event_allowed_timeout_not_expired(minimal_config, mock_api)
     """Timeout state with expires_ts in the future -> reject."""
     now_ms = int(time.time() * 1000)
     future = now_ms + 60000
-    mock_api.get_state_event = AsyncMock(return_value=MagicMock(
+    timeout_ev = MagicMock(
+        type=TIMEOUT_EVENT_TYPE,
+        state_key="@user:test.server",
         content={"expires_ts": future},
-    ))
+    )
+    mock_api.get_state_events_in_room = AsyncMock(return_value=[timeout_ev])
     module = DiscordifySpacesModule(minimal_config, mock_api)
     event = MagicMock()
     event.sender = "@user:test.server"
@@ -90,15 +97,27 @@ async def test_check_event_allowed_timeout_not_expired(minimal_config, mock_api)
 
 
 @pytest.mark.asyncio
+async def test_check_event_allowed_state_lookup_error_propagates(minimal_config, mock_api):
+    """If state lookup fails, the error propagates (timeout is not bypassed)."""
+    mock_api.get_state_events_in_room = AsyncMock(side_effect=RuntimeError("state lookup failed"))
+    module = DiscordifySpacesModule(minimal_config, mock_api)
+    event = MagicMock()
+    event.sender = "@user:test.server"
+    event.room_id = "!room:test"
+    with pytest.raises(RuntimeError, match="state lookup failed"):
+        await module.check_event_allowed(event, None)
+
+
+@pytest.mark.asyncio
 async def test_check_event_allowed_uses_space_from_parent(minimal_config, mock_api):
     """When state_events has m.space.parent, timeout is checked in parent space."""
-    mock_api.get_state_event = AsyncMock(return_value=None)
+    mock_api.get_state_events_in_room = AsyncMock(return_value=[])
     module = DiscordifySpacesModule(minimal_config, mock_api)
     event = MagicMock()
     event.sender = "@user:test.server"
     event.room_id = "!child:test"
     state_events = [("m.space.parent", "!space:test")]
     await module.check_event_allowed(event, state_events)
-    mock_api.get_state_event.assert_called_once()
-    call_args = mock_api.get_state_event.call_args
+    mock_api.get_state_events_in_room.assert_called_once()
+    call_args = mock_api.get_state_events_in_room.call_args
     assert call_args[0][0] == "!space:test"

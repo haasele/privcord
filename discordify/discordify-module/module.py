@@ -108,13 +108,10 @@ class DiscordifySpacesModule:
         )
 
     async def _get_state_event(self, room_id: str, event_type: str, state_key: str) -> Optional[Any]:
-        try:
-            events = await self.api.get_state_events_in_room(room_id, [(event_type, state_key)])
-            for ev in events:
-                if ev.type == event_type and ev.state_key == state_key:
-                    return ev
-        except Exception:
-            pass
+        events = await self.api.get_state_events_in_room(room_id, [(event_type, state_key)])
+        for ev in events:
+            if ev.type == event_type and ev.state_key == state_key:
+                return ev
         return None
 
     async def _send_state_event(self, room_id: str, sender: str, event_type: str, state_key: str, content: dict) -> None:
