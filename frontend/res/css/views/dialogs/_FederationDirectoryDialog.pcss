@@ -1,0 +1,72 @@
+/*
+Copyright 2024 New Vector Ltd.
+SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
+*/
+
+.mx_FederationDirectoryDialog_content {
+    min-height: 120px;
+}
+
+.mx_FederationDirectoryDialog_intro {
+    margin-bottom: $spacing-16;
+    color: $secondary-content;
+    font-size: $font-14px;
+}
+
+.mx_FederationDirectoryDialog_empty {
+    color: $tertiary-content;
+    text-align: center;
+    padding: $spacing-24;
+}
+
+.mx_FederationDirectoryDialog_error {
+    color: $alert;
+    padding: $spacing-8;
+}
+
+.mx_FederationDirectoryDialog_list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.mx_FederationDirectoryDialog_item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-12;
+    padding: $spacing-8 $spacing-12;
+    border-radius: 8px;
+    margin-bottom: $spacing-4;
+
+    &:hover {
+        background: $quinary-content;
+    }
+}
+
+.mx_FederationDirectoryDialog_itemName {
+    font-weight: 600;
+    font-size: $font-15px;
+    color: $primary-content;
+    flex-shrink: 0;
+}
+
+.mx_FederationDirectoryDialog_itemServer {
+    color: $tertiary-content;
+    font-size: $font-13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.mx_FederationDirectoryDialog_itemLink {
+    flex-shrink: 0;
+    color: $accent;
+    display: flex;
+    align-items: center;
+
+    svg {
+        width: 16px;
+        height: 16px;
+    }
+}
