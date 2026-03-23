@@ -206,7 +206,8 @@ Please see LICENSE files in the repository root for full details.
         }
 
         &.mx_SpaceButton_newCancel .mx_SpaceButton_icon svg {
-            transform: rotate(45deg);
+            /* Keep the + icon visible (Discord-style) instead of rotating to × */
+            transform: none;
         }
 
         .mx_SpaceButton_menuButton {
