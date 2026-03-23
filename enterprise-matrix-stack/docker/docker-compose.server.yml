@@ -1,0 +1,106 @@
+# Privcord server stack template.
+# Launched per-server with: docker compose -p privcord-<handle> -f docker-compose.server.yml up -d
+# Environment variables (set via .env or export):
+#   SERVER_DOMAIN, SERVER_HANDLE, SPACE_NAME, SPACE_DESCRIPTION
+#   POSTGRES_MAIN_PASSWORD, POSTGRES_MEDIA_PASSWORD, REDIS_PASSWORD
+#   SYNAPSE_REGISTRATION_SECRET, LIVEKIT_API_KEY, LIVEKIT_API_SECRET
+#   SYNAPSE_PORT (default 8008), FEDERATION_PORT (default 8448)
+#   LIVEKIT_PORT (default 7880), ELEMENT_CALL_PORT (default 8280)
+#   FEDERATION_MODE (private|public), FEDERATION_WHITELIST (comma-separated)
+---
+services:
+  postgres-main:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: ${POSTGRES_MAIN_PASSWORD:-changeme}
+    volumes:
+      - postgres-main-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-media:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: synapse_media
+      POSTGRES_USER: synapse_media
+      POSTGRES_PASSWORD: ${POSTGRES_MEDIA_PASSWORD:-changeme}
+    volumes:
+      - postgres-media-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse_media"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  synapse:
+    image: synapse-discordify:latest
+    user: "0"
+    depends_on:
+      postgres-main: { condition: service_healthy }
+      postgres-media: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+    volumes:
+      - ./generated/${SERVER_HANDLE:-default}:/config:ro
+      - synapse-data:/data
+    ports:
+      - "${SYNAPSE_PORT:-8008}:8008"
+      - "${FEDERATION_PORT:-8448}:8448"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/_matrix/client/versions"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: ["--config", "/etc/livekit.yaml", "--bind", "0.0.0.0"]
+    volumes:
+      - ./generated/${SERVER_HANDLE:-default}/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"
+    depends_on:
+      redis: { condition: service_healthy }
+
+  lk-jwt-service:
+    image: ghcr.io/element-hq/lk-jwt-service:0.4.1
+    environment:
+      LK_JWT_PORT: "8080"
+      LIVEKIT_URL: "http://livekit:7880"
+      LIVEKIT_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_SECRET: ${LIVEKIT_API_SECRET:-devsecret}
+      LIVEKIT_LOCAL_HOMESERVERS: ${SERVER_DOMAIN:-localhost}
+    depends_on:
+      - livekit
+
+  element-call:
+    image: ghcr.io/element-hq/element-call:latest
+    environment:
+      HOMESERVER_URL: "http://synapse:8008"
+      LIVEKIT_URL: "ws://livekit:7880"
+    ports:
+      - "${ELEMENT_CALL_PORT:-8280}:80"
+    depends_on:
+      - synapse
+      - livekit
+
+volumes:
+  postgres-main-data: {}
+  postgres-media-data: {}
+  synapse-data: {}
